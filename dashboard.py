@@ -1187,8 +1187,7 @@ def update_savings_monitor(selected_months, selected_categories, reset_clicks, c
      Output('lowest-category-kpi-name', 'children'),
      Output('lowest-category-kpi-value', 'children'),
      Output('investments-monthly-trend-chart', 'figure'),
-     Output('investments-categories-chart', 'figure'), # This was missing in the original return
-     Output('investments-by-category-chart', 'figure'),
+     Output('investments-category-bar-chart', 'figure'),
      Output('investments-data-table', 'data'),
      Output('investments-data-table', 'columns')],
     [Input('investments-month-filter', 'value'),
@@ -1199,14 +1198,14 @@ def update_savings_monitor(selected_months, selected_categories, reset_clicks, c
 )
 def update_investments_kpis_and_charts(selected_months, selected_categories, reset_clicks, stored_investments_data, pathname):
     if pathname != '/investments':
-        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
 
     ctx = dash.callback_context
     if not stored_investments_data:
         # Return no_update for all outputs if no data exists
         default_figure = go.Figure()
         default_figure.update_layout(template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#E0E0E0"), title="No data to display")
-        return ([], [], "₹0.00", "₹0.00", "N/A", "₹0.00", "N/A", "₹0.00", default_figure, default_figure, default_figure, [], [])
+        return ([], [], "₹0.00", "₹0.00", "N/A", "₹0.00", "N/A", "₹0.00", default_figure, default_figure, [], [])
 
     df = pd.read_json(io.StringIO(stored_investments_data), orient='split')
     df['Month'] = pd.Categorical(df['Month'], categories=['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], ordered=True)
@@ -1251,36 +1250,16 @@ def update_investments_kpis_and_charts(selected_months, selected_categories, res
     )
     monthly_trend_chart.update_layout(title_x=0.5, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color=CUSTOM_COLOR_PALETTE[0]))
 
-    pie_chart = px.pie(
-        category_summary,
-        values='Amount',
-        names='Category',
-        title=f"<span style='color:{CUSTOM_COLOR_PALETTE[1]}'>Investment Categories Breakdown</span>",
-        color_discrete_sequence=CUSTOM_COLOR_PALETTE,
-        template="plotly_dark",
-    )
-    pie_chart.update_layout(title_x=0.5, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color=CUSTOM_COLOR_PALETTE[0]))
-
-    monthly_category_summary = filtered_df.groupby(["Month", "Category"])["Amount"].sum().reset_index()
     bar_chart = px.bar(
-        monthly_category_summary,
-        x="Month",
-        y="Amount",
-        color="Category",
-        title=f"<span style='color:{CUSTOM_COLOR_PALETTE[2]}'>Monthly Investments Breakdown by Category</span>",
-        barmode="group",
+        category_summary,
+        x='Category',
+        y='Amount',
+        title=f"<span style='color:{CUSTOM_COLOR_PALETTE[1]}'>Investment Categories Breakdown</span>",
+        color='Category',
         color_discrete_sequence=CUSTOM_COLOR_PALETTE,
-        labels={"Amount": "Amount (₹)", "Month": "Month", "Category": "Category"},
         template="plotly_dark",
     )
-    bar_chart.update_layout(
-        title_x=0.5,
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
-        font=dict(color=CUSTOM_COLOR_PALETTE[0]),
-        yaxis_title="Amount (₹)",
-        xaxis_title="Month",
-    )
+    bar_chart.update_layout(title_x=0.5, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color=CUSTOM_COLOR_PALETTE[0]))
 
     # Data Table
     table_data = filtered_df.to_dict('records')
@@ -1299,7 +1278,6 @@ def update_investments_kpis_and_charts(selected_months, selected_categories, res
         lowest_category_name,
         lowest_category_value,
         monthly_trend_chart,
-        pie_chart,
         bar_chart,
         table_data,
         table_columns
