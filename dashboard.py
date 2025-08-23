@@ -8,6 +8,9 @@ import re
 import dash_bootstrap_components as dbc
 import os
 import time
+import base64
+import json
+import tempfile
 
 # --- Helper function to ensure unique column names ---
 def make_unique_column_names(column_list):
@@ -33,11 +36,14 @@ def make_unique_column_names(column_list):
 # for deployment.
 
 # Import these libraries at the top of your file
-import json
-import tempfile
 
 # Define the scopes required for Google Sheets API access
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+
+# Placeholder for client and DataFrame initialization
+client = None
+df_combined = pd.DataFrame()
+error_message = None
 
 try:
     if os.environ.get("GCP_SA_CREDENTIALS"):
@@ -57,7 +63,8 @@ try:
     print("Authentication successful!")
 
 except Exception as e:
-    print(f"Authentication failed with error: {e}")
+    error_message = f"❌ Authentication failed with error: {e}"
+    print(error_message)
     client = None
     df_combined = pd.DataFrame()
     
