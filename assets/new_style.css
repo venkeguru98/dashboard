@@ -1,0 +1,546 @@
+/* Import Google Fonts - Montserrat for headings, Open Sans for body */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@300;400;600;700&display=swap');
+
+/* --- CSS Variables for Vaporwave Synapse Theme --- */
+:root {
+    --bg-black: #000000; /* Pure black background */
+    --bg-panel: #1A1A1A; /* Dark grey for cards/panels */
+    --bg-header: #0A0A0A; /* Even darker for header */
+    --text-light: #E0E0E0; /* Light grey for primary text */
+    --text-muted: #888888; /* Muted grey for secondary text */
+
+    /* Vibrant Accent Colors (High Contrast) */
+    --accent-cyan: #00FFFF;
+    --accent-magenta: #FF00FF;
+    --accent-lime: #39FF14;
+    --accent-blue: #4169E1; /* RoyalBlue */
+    --accent-purple: #8A2BE2; /* BlueViolet */
+    --accent-gold: #FFD700;
+
+    /* Gradients for "Shiny" effect */
+    --gradient-header: linear-gradient(90deg, #101010 0%, #050505 100%);
+    --gradient-nav-active: linear-gradient(90deg, var(--accent-cyan) 0%, var(--accent-lime) 100%);
+    --gradient-button: linear-gradient(45deg, var(--accent-magenta) 0%, var(--accent-purple) 100%);
+    --gradient-reset-button: linear-gradient(45deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+
+    /* Glows */
+    --glow-cyan: 0 0 15px rgba(0, 255, 255, 0.6);
+    --glow-magenta: 0 0 15px rgba(255, 0, 255, 0.6);
+    --glow-lime: 0 0 15px rgba(0, 255, 0, 0.6);
+    --glow-blue: 0 0 15px rgba(65, 105, 225, 0.6);
+    --glow-purple: 0 0 15px rgba(138, 43, 226, 0.6);
+    --glow-gold: 0 0 15px rgba(255, 215, 0, 0.6);
+
+
+    --border-subtle: 1px solid rgba(255, 255, 255, 0.1); /* Very subtle white border */
+    --border-radius-base: 6px;
+    --border-radius-lg: 10px;
+    --transition-fast: 0.2s ease-in-out;
+
+    --font-heading: 'Montserrat', sans-serif;
+    --font-body: 'Open Sans', sans-serif;
+}
+
+/* --- General Body and Font Styling --- */
+body {
+    font-family: var(--font-body);
+    background-color: var(--bg-black);
+    color: var(--text-light);
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    color: var(--text-light);
+}
+
+p, label, button, .card-title, .form-label, .nav-link-new-theme,
+.search-input-new-theme::placeholder, .dash-cell {
+    font-family: var(--font-body);
+}
+
+/* Specific styling for KPIs and values */
+.kpi-value-new-theme, .kpi-sub-value-new-theme-small {
+    font-family: var(--font-heading); /* Use Montserrat for numbers to give them weight */
+    font-weight: 700;
+}
+
+
+.dashboard-container-new-theme {
+    padding: 0 !important;
+    max-width: 100% !important;
+    margin: 0 auto;
+}
+
+/* --- Top Header/Navbar Styling --- */
+.top-navbar-new-theme {
+    background: var(--gradient-header);
+    border-bottom: var(--border-subtle);
+    padding: 1.2rem 2.5rem;
+    box-shadow: 0 2px 20px rgba(0, 0, 0, 0.5); /* Deep shadow */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    width: 100%;
+    z-index: 1000;
+}
+
+.header-title-new-theme {
+    font-weight: 800;
+    font-size: 2.2rem;
+    color: var(--accent-magenta);
+    letter-spacing: 1.5px;
+    text-shadow: var(--glow-magenta);
+    margin: 0;
+}
+
+.header-nav-new-theme .nav-link-new-theme {
+    color: var(--text-light);
+    padding: 0.7rem 1.2rem;
+    border-radius: var(--border-radius-base);
+    transition: all var(--transition-fast);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    margin-left: 0.8rem; /* Space between horizontal links */
+}
+
+.header-nav-new-theme .nav-link-new-theme:hover {
+    background-color: rgba(255, 255, 255, 0.05); /* Very light hover */
+    color: var(--accent-cyan);
+    transform: translateY(-2px);
+    box-shadow: var(--glow-cyan);
+}
+
+.header-nav-new-theme .nav-link-new-theme.active {
+    background: var(--gradient-nav-active);
+    color: var(--bg-black) !important; /* Text against bright gradient */
+    font-weight: 700;
+    box-shadow: var(--glow-cyan);
+    border: none;
+    text-shadow: none; /* No text shadow on active */
+}
+
+.header-nav-new-theme .nav-link-new-theme .bi {
+    font-size: 1.1em;
+    margin-right: 0.5rem;
+}
+
+/* --- Main Content Area --- */
+.main-content-new-theme {
+    padding: 2.5rem !important;
+    background-color: var(--bg-black); /* Ensure consistent black background */
+    min-height: calc(100vh - 80px); /* Adjust based on header height */
+}
+
+/* --- Filter Card Styling --- */
+.filter-card-new-theme {
+    background-color: var(--bg-panel);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--glow-blue); /* Blue glow */
+    padding: 2.5rem;
+    border: var(--border-subtle);
+}
+
+.card-title-new-theme {
+    color: var(--accent-cyan);
+    font-weight: 700;
+    font-size: 1.8rem;
+    letter-spacing: 0.8px;
+    text-shadow: var(--glow-cyan);
+}
+
+.form-label-new-theme {
+    font-weight: 500;
+    color: var(--text-light);
+    margin-bottom: 0.6rem;
+    display: block;
+    font-size: 0.95rem;
+}
+
+/* Dropdown Overrides */
+.dropdown-new-theme .Select-control,
+.dropdown-new-theme .Select-menu-outer {
+    background-color: var(--bg-black) !important; /* Pure black dropdown */
+    border: var(--border-subtle) !important;
+    color: var(--text-light) !important;
+    box-shadow: none !important;
+    border-radius: var(--border-radius-base);
+}
+
+.dropdown-new-theme .Select-placeholder {
+    color: var(--text-muted) !important;
+}
+
+.dropdown-new-theme .Select-value-label {
+    color: var(--accent-cyan) !important; /* Cyan for selected values */
+}
+
+.dropdown-new-theme .Select--multi .Select-value {
+    background-color: rgba(0, 255, 255, 0.15) !important; /* Light cyan background for tags */
+    color: var(--accent-cyan) !important;
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 0.9em;
+    font-weight: 500;
+    border: 1px solid var(--accent-cyan);
+}
+
+.dropdown-new-theme .Select-option.is-focused {
+    background-color: var(--bg-panel) !important;
+    color: var(--accent-lime) !important; /* Lime on hover */
+}
+
+.dropdown-new-theme .Select-option.is-selected {
+    background-color: var(--accent-purple) !important;
+    color: var(--text-light) !important;
+}
+
+.dropdown-new-theme .Select-input {
+    color: var(--text-light) !important;
+}
+
+/* Reset Button (also used for Export) */
+.btn-reset-new-theme {
+    background: var(--gradient-reset-button) !important; /* Blue-Purple gradient */
+    border: none !important;
+    color: var(--text-light);
+    font-weight: 600;
+    padding: 14px 22px;
+    border-radius: var(--border-radius-base);
+    transition: all var(--transition-fast);
+    font-size: 1.05rem;
+    box-shadow: var(--glow-purple); /* Purple glow */
+}
+
+.btn-reset-new-theme:hover {
+    opacity: 0.9;
+    transform: translateY(-3px);
+    box-shadow: 0 0 20px rgba(138, 43, 226, 0.8);
+}
+
+.btn-reset-new-theme:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(138, 43, 226, 0.5) !important;
+}
+
+/* --- KPI Cards --- */
+.kpi-card-new-theme {
+    background-color: var(--bg-panel);
+    border-radius: var(--border-radius-lg);
+    padding: 2rem;
+    text-align: center;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.4); /* subtle dark shadow */
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    border: var(--border-subtle);
+}
+
+.kpi-card-new-theme:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--glow-cyan); /* Interactive cyan glow on hover */
+}
+
+.kpi-label-new-theme {
+    font-size: 1.0rem;
+    color: var(--text-muted);
+    margin-bottom: 0.8rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* KPI Values - High Contrast */
+.kpi-value-new-theme {
+    font-size: 1.8rem;
+    font-weight: 800;
+    line-height: 1.1;
+    color: var(--accent-cyan); /* Bright cyan */
+    text-shadow: var(--glow-cyan);
+}
+
+.kpi-value-small-new-theme {
+    font-size: 1.8rem; /* Larger for name */
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 0.3rem;
+    color: var(--accent-magenta); /* Bright magenta */
+    text-shadow: var(--glow-magenta);
+}
+
+.kpi-sub-value-new-theme-small {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--accent-lime); /* Bright lime green */
+    text-shadow: var(--glow-lime);
+}
+
+/* --- Chart Panels --- */
+.chart-panel-new-theme {
+    background-color: var(--bg-panel);
+    border-radius: var(--border-radius-lg);
+    padding: 1.8rem;
+    box-shadow: var(--glow-purple); /* Purple glow */
+    border: var(--border-subtle);
+    overflow: hidden;
+}
+
+/* Plotly graph title and axes text */
+.modebar, .g-gtitle, .xtick, .ytick, .gtitle, .annotation-text, .infolayer .g-text, .infolayer .gtitle {
+    font-family: var(--font-body) !important;
+    fill: var(--text-light) !important;
+}
+
+/* Plotly axis and grid colors */
+.xtick, .ytick {
+    stroke: rgba(255, 255, 255, 0.15) !important; /* Lighter borders */
+}
+.xaxislayer-above .axis-line, .yaxislayer-above .axis-line {
+    stroke: rgba(255, 255, 255, 0.2) !important;
+}
+.gridlayer .xgrid, .gridlayer .ygrid {
+    stroke: rgba(255, 255, 255, 0.08) !important; /* Very subtle grid */
+}
+
+/* Ensure Plotly chart backgrounds are transparent in Python to let panel background show */
+
+
+/* --- Data Table Section --- */
+.table-panel-new-theme {
+    background-color: var(--bg-panel);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--glow-lime); /* Lime glow for table */
+    border: var(--border-subtle);
+    padding: 2rem;
+}
+
+.section-title-new-theme {
+    font-weight: 700;
+    font-size: 2rem;
+    color: var(--accent-gold); /* Gold accent for table title */
+    letter-spacing: 1px;
+    text-shadow: var(--glow-gold);
+}
+
+/* Dash Data Table specific styles */
+.dash-spreadsheet-container .dash-spreadsheet-table {
+    border: none !important;
+}
+.dash-header-row div {
+    background-color: var(--bg-black) !important; /* Pure black header */
+    color: var(--accent-cyan) !important;
+    font-weight: 700 !important;
+    border-bottom: 2px solid var(--accent-lime) !important; /* Lime separator */
+    padding: 15px 10px !important;
+}
+.dash-cell {
+    background-color: var(--bg-panel) !important;
+    color: var(--text-light) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+    padding: 12px 10px !important;
+}
+.dash-cell.column-0 { /* First column (Category) special styling */
+    color: var(--accent-magenta) !important;
+    font-weight: 600;
+}
+.dash-spreadsheet-container .dash-fixed-column-header,
+.dash-spreadsheet-container .dash-fixed-column {
+    background-color: var(--bg-black) !important; /* Ensure fixed columns match header */
+    box-shadow: 2px 0 5px rgba(0,0,0,0.5); /* Subtle shadow for fixed column */
+}
+/* Style for filter input fields in the table header */
+.dash-spreadsheet-container .dash-filter input {
+    background-color: var(--bg-black) !important;
+    border: 1px solid var(--text-muted) !important;
+    border-radius: 4px;
+    color: var(--text-light) !important;
+    padding: 5px 8px;
+    font-size: 0.9em;
+    width: 90%;
+    margin: 0 auto; /* Center the input */
+    display: block; /* Ensure it takes full width within its cell */
+}
+
+/* Style for sort indicators */
+.dash-spreadsheet-container .column-header--sort,
+.dash-spreadsheet-container .column-header--sort:hover {
+    color: var(--accent-lime) !important; /* Green for sortable headers */
+}
+.dash-spreadsheet-container .column-header--sort::before {
+    color: var(--accent-lime) !important; /* Green sort arrow */
+}
+
+
+.dash-spreadsheet-container .dash-pagination-container {
+    background-color: var(--bg-black) !important;
+    border-top: var(--border-subtle);
+    padding-top: 15px;
+}
+.dash-spreadsheet-container .dash-pagination-container .dash-next-button,
+.dash-spreadsheet-container .dash-pagination-container .dash-previous-button,
+.dash-spreadsheet-container .dash-pagination-container .dash-page-input {
+    background-color: var(--bg-panel) !important;
+    color: var(--text-light) !important;
+    border: var(--border-subtle) !important;
+    border-radius: var(--border-radius-base);
+}
+.dash-spreadsheet-container .dash-pagination-container .dash-page-input:focus {
+    border-color: var(--accent-cyan) !important;
+    box-shadow: var(--glow-cyan);
+}
+
+
+/* Dash Loading Component Styling */
+.dash-loading-callback {
+    min-height: 250px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(0, 0, 0, 0.6); /* Slightly more opaque overlay */
+    border-radius: var(--border-radius-base);
+}
+
+/* --- Data Loading Status Alert --- */
+.data-load-alert {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 2000;
+    width: auto;
+    max-width: 450px;
+    padding: 15px 25px;
+    border-radius: var(--border-radius-base);
+    box-shadow: var(--glow-lime); /* Lime glow for alert */
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out;
+}
+
+/* Adjusted alert colors to fit new theme */
+.data-load-alert.alert-success { background-color: rgba(0, 255, 0, 0.15); border-left: 5px solid var(--accent-lime); color: var(--accent-lime); }
+.data-load-alert.alert-danger { background-color: rgba(255, 0, 0, 0.15); border-left: 5px solid #FF0000; color: #FF6060; }
+.data-load-alert.alert-warning { background-color: rgba(255, 215, 0, 0.15); border-left: 5px solid var(--accent-gold); color: var(--accent-gold); }
+.data-load-alert.alert-info { background-color: rgba(0, 255, 255, 0.15); border-left: 5px solid var(--accent-cyan); color: var(--accent-cyan); }
+
+
+.data-load-alert.fade-in {
+    opacity: 1;
+}
+
+.data-load-alert.fade-out {
+    animation: fadeOut 3s forwards;
+}
+
+@keyframes fadeOut {
+    0% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { opacity: 0; display: none; }
+}
+
+
+/* --- Custom Scrollbar (for Webkit browsers) --- */
+::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-panel);
+    border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--accent-purple); /* Purple thumb */
+    border-radius: 6px;
+    border: 2px solid var(--bg-black);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-magenta); /* Magenta on hover */
+    box-shadow: 0 0 5px var(--accent-magenta);
+}
+
+/* New: Gold/Silver Price Page Specifics */
+.gold-silver-kpi-container {
+    display: flex;
+    justify-content: center;
+    gap: 20px; /* Space between the KPI cards */
+    flex-wrap: wrap; /* Allow cards to wrap on smaller screens */
+}
+
+/* Specific styling for gold/silver cards if needed */
+.gold-card .kpi-value-new-theme {
+    color: var(--accent-gold); /* Gold color for Gold price */
+    text-shadow: var(--glow-gold);
+}
+.silver-card .kpi-value-new-theme {
+    color: var(--text-light); /* Lighter color for Silver price */
+    text-shadow: var(--glow-cyan);
+}
+
+/* Colors for positive/negative changes */
+.text-success { color: var(--accent-lime) !important; } /* Neon Green for positive change */
+.text-danger { color: var(--accent-magenta) !important; } /* Magenta for negative change */
+
+
+/* --- Responsive Adjustments --- */
+@media (max-width: 992px) {
+    .top-navbar-new-theme {
+        flex-direction: column;
+        padding: 1rem 1.5rem;
+    }
+    .header-title-new-theme {
+        font-size: 1.8rem;
+        margin-bottom: 1rem;
+    }
+    .header-nav-new-theme {
+        width: 100%;
+        justify-content: center;
+    }
+    .header-nav-new-theme .nav-link-new-theme {
+        margin: 0.2rem 0.5rem;
+        padding: 0.6rem 1rem;
+        font-size: 0.9rem;
+    }
+    .header-nav-new-theme .nav-link-new-theme .bi {
+        margin-right: 0.5rem !important;
+    }
+    .main-content-new-theme { padding: 1.5rem !important; }
+    .filter-card-new-theme { padding: 1.5rem; }
+    .btn-reset-new-theme { font-size: 0.95rem; padding: 10px 15px; }
+    .dash-spreadsheet-container .dash-header-row div,
+    .dash-spreadsheet-container .dash-cell { font-size: 0.8rem; }
+    .kpi-value-new-theme { font-size: 2.2rem; }
+    .kpi-value-small-new-theme { font-size: 1.5rem; }
+    .kpi-sub-value-new-theme-small { font-size: 1.1rem; }
+    .kpi-card-new-theme { padding: 1.5rem; }
+    .chart-panel-new-theme { padding: 1.5rem; }
+    .table-panel-new-theme { padding: 1.5rem; }
+    .section-title-new-theme { font-size: 1.8rem; }
+}
+
+@media (max-width: 768px) {
+    .header-title-new-theme {
+        font-size: 1.5rem;
+    }
+    .header-nav-new-theme {
+        flex-wrap: wrap;
+    }
+    .header-nav-new-theme .nav-link-new-theme {
+        flex-basis: calc(50% - 1rem); /* Two items per row */
+        margin: 0.2rem 0.5rem;
+        justify-content: center;
+    }
+    .main-content-new-theme { padding: 1rem !important; }
+    .kpi-value-new-theme { font-size: 1.5rem; }
+    .kpi-value-small-new-theme { font-size: 1.3rem; }
+    .kpi-sub-value-new-theme-small { font-size: 0.9rem; }
+
+    /* For Gold/Silver cards on very small screens */
+    .gold-silver-kpi-container .kpi-card-new-theme {
+        width: 90%; /* Take more width on small screens */
+    }
+}
