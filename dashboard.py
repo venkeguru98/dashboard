@@ -460,6 +460,7 @@ dashboard_page_layout = dbc.Col(
 # --- Layout for the Savings Monitor Page ---
 savings_monitor_layout = dbc.Col(
     [
+        html.Div(id="savings-load-status", className="data-load-alert"),
         dbc.Row(
             dbc.Col(
                 html.H2("💰 Savings Monitor", className="section-title-new-theme text-center mb-4", style={'color': 'var(--accent-lime)', 'textShadow': 'var(--glow-lime)'}),
@@ -625,6 +626,7 @@ savings_monitor_layout = dbc.Col(
 # --- Layout for the Investments Page ---
 investments_layout = dbc.Col(
     [
+        html.Div(id="investments-load-status", className="data-load-alert"),
         dbc.Row(
             dbc.Col(
                 html.H2("💰 Investments", className="section-title-new-theme text-center mb-4", style={'color': 'var(--accent-gold)', 'textShadow': 'var(--glow-gold)'}),
@@ -946,9 +948,13 @@ def update_load_status_and_filters(stored_icic_data_json, error_message, pathnam
     Input('month-filter', 'value'),
     Input('category-filter', 'value'),
     Input('stored-icic-data', 'data'),
-    Input('reset-filters-button', 'n_clicks')
+    Input('reset-filters-button', 'n_clicks'),
+    State('url', 'pathname')
 )
-def update_dashboard_content(selected_months, selected_categories, stored_icic_data_json, reset_clicks):
+def update_dashboard_content(selected_months, selected_categories, stored_icic_data_json, reset_clicks, pathname):
+    if pathname != '/':
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+
     ctx = dash.callback_context
     if not ctx.triggered:
         # Initial load or no interaction
@@ -1080,9 +1086,13 @@ def update_dashboard_content(selected_months, selected_categories, stored_icic_d
     Input('stored-canara-data', 'data'),
     Input('savings-month-filter', 'value'),
     Input('savings-category-filter', 'value'),
-    Input('savings-reset-filters-button', 'n_clicks')
+    Input('savings-reset-filters-button', 'n_clicks'),
+    State('url', 'pathname')
 )
-def update_savings_monitor(stored_canara_data_json, selected_months, selected_categories, reset_clicks):
+def update_savings_monitor(stored_canara_data_json, selected_months, selected_categories, reset_clicks, pathname):
+    if pathname != '/savings':
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+
     ctx = dash.callback_context
     if ctx.triggered and ctx.triggered[0]['prop_id'].split('.')[0] == 'savings-reset-filters-button':
         selected_months = []
@@ -1207,9 +1217,13 @@ def calculate_savings_goal(n_clicks, target_amount, duration):
     Input('stored-investments-data', 'data'),
     Input('investments-month-filter', 'value'),
     Input('investments-category-filter', 'value'),
-    Input('investments-reset-filters-button', 'n_clicks')
+    Input('investments-reset-filters-button', 'n_clicks'),
+    State('url', 'pathname')
 )
-def update_investments_page(stored_investments_data_json, selected_months, selected_categories, reset_clicks):
+def update_investments_page(stored_investments_data_json, selected_months, selected_categories, reset_clicks, pathname):
+    if pathname != '/investments':
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+
     ctx = dash.callback_context
     if ctx.triggered and ctx.triggered[0]['prop_id'].split('.')[0] == 'investments-reset-filters-button':
         selected_months = []
@@ -1312,9 +1326,13 @@ def update_investments_page(stored_investments_data_json, selected_months, selec
     Input('raw-data-source-dropdown', 'value'),
     State('stored-icic-data', 'data'),
     State('stored-canara-data', 'data'),
-    State('stored-investments-data', 'data')
+    State('stored-investments-data', 'data'),
+    State('url', 'pathname')
 )
-def update_raw_data_table(selected_source, icic_data_json, canara_data_json, investments_data_json):
+def update_raw_data_table(selected_source, icic_data_json, canara_data_json, investments_data_json, pathname):
+    if pathname != '/data-table':
+        return no_update, no_update
+    
     df = pd.DataFrame()
     if selected_source == 'icic' and icic_data_json:
         df = pd.read_json(io.StringIO(icic_data_json), orient='split')
