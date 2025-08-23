@@ -8,9 +8,9 @@ import re
 import dash_bootstrap_components as dbc
 import os
 import time
-import base64
 import json
 import tempfile
+import base64
 
 # --- Helper function to ensure unique column names ---
 def make_unique_column_names(column_list):
@@ -28,52 +28,40 @@ def make_unique_column_names(column_list):
     return unique_list
 
 # --- Google Sheets Authentication and Data Retrieval ---
-# IMPORTANT: Update this path to your service account JSON file.
-#SERVICE_ACCOUNT_FILE = r"C:\Users\JEEVALAKSHMI R\Videos\dashboard_for_expense\icic-salary-data-52568c61b6e3.json"
-
-# --- Google Sheets Authentication and Data Retrieval ---
 # IMPORTANT: This section has been updated to handle credentials securely
 # for deployment.
 
-# Import these libraries at the top of your file
-
-# Define the scopes required for Google Sheets API access
-SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
-
-# Placeholder for client and DataFrame initialization
-client = None
-df_combined = pd.DataFrame()
-error_message = None
-
-try:
-    if os.environ.get("GCP_SA_CREDENTIALS"):
-        # Decode the Base64 string from the environment variable
-        credentials_json_bytes = base64.b64decode(os.environ.get("GCP_SA_CREDENTIALS"))
-        credentials_json = credentials_json_bytes.decode('utf-8')
-        creds_dict = json.loads(credentials_json)
-        creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+# Check for credentials in an environment variable for deployment
+if "GCP_SA_CREDENTIALS" in os.environ:
+    credentials_content_base64 = os.environ.get("GCP_SA_CREDENTIALS")
+    try:
+        # Decode the Base64 string
+        credentials_content = base64.b64decode(credentials_content_base64).decode('utf-8')
+        # Create a temporary file to hold the credentials
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as temp_file:
+            temp_file.write(credentials_content)
+            SERVICE_ACCOUNT_FILE = temp_file.name
         print("Authenticated using Base64 environment variable.")
-    else:
-        # Fallback to local file for development
-        SERVICE_ACCOUNT_FILE = "credentials.json"
-        creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-        print("Authenticated using local file.")
-        
-    client = gspread.authorize(creds)
-    print("Authentication successful!")
-
-except Exception as e:
-    error_message = f"❌ Authentication failed with error: {e}"
-    print(error_message)
-    client = None
-    df_combined = pd.DataFrame()
+    except (json.JSONDecodeError, ValueError) as e:
+        print(f"Error parsing JSON from environment variable: {e}")
+        SERVICE_ACCOUNT_FILE = None
+        raise Exception("Failed to load service account credentials from environment variable.")
+else:
+    # Fallback to local file path for local development
+    SERVICE_ACCOUNT_FILE = r"C:\Users\JEEVALAKSHMI R\Videos\dashboard_for_expense\icic-salary-data-52568c61b6e3.json"
+    print("Using local service account file path. Set GCP_SA_CREDENTIALS for deployment.")
     
 def load_data_from_google_sheets():
     df_icic = pd.DataFrame()
     df_canara = pd.DataFrame()
     df_investments = pd.DataFrame()
     error_message = None
-
+    
+    # This check is for local development only. Render will handle the environment variable.
+    if not os.path.exists(SERVICE_ACCOUNT_FILE) and "GCP_SA_CREDENTIALS" not in os.environ:
+        error_message = f"❌ Error: Service account file not found at {SERVICE_ACCOUNT_FILE}. Please update the path."
+        return df_icic, df_canara, df_investments, error_message
+    
     try:
         scope = [
             "https://www.googleapis.com/auth/spreadsheets.readonly",
@@ -81,6 +69,7 @@ def load_data_from_google_sheets():
         ]
         creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scope)
         client = gspread.authorize(creds)
+        print("Authentication successful!")
 
         sheet_url = "https://docs.google.com/spreadsheets/d/1o1e8ouOghU_1L592pt_OSxn6aUSY5KNm1HOT6zbbQOA/edit?gid=1788780645#gid=1788780645"
         spreadsheet = client.open_by_url(sheet_url)
@@ -789,14 +778,12 @@ investments_layout = dbc.Col(
 )
 
 # --- Callbacks ---
-
 # Callback for routing
-@app.callback(Output('page-content', 'children'),
-              Input('url', 'pathname'))
+@app.callback(Output('page-content', 'children'), Input('url', 'pathname'))
 def display_page(pathname):
     if pathname == '/savings':
         return savings_monitor_layout
-    elif pathname == '/investments':  # New Investments page
+    elif pathname == '/investments': # New Investments page
         return investments_layout
     elif pathname == '/analytics':
         return html.Div([html.H3("Analytics & Trends Page - Under Construction", className="text-light text-center mt-5")])
@@ -811,18 +798,17 @@ def display_page(pathname):
 @app.callback(
     Output('stored-icic-data', 'data'),
     Output('stored-canara-data', 'data'),
-    Output('stored-investments-data', 'data'),  # New output for investments data
+    Output('stored-investments-data', 'data'), # New output for investments data
     Output('loading-error-message', 'data'),
     Input('interval-component', 'n_intervals'),
 )
 def load_and_store_data(n_intervals):
     print(f"Attempting to load data... Interval count: {n_intervals}")
     df_icic_loaded, df_canara_loaded, df_investments_loaded, error = load_data_from_google_sheets()
-    
     return (
         df_icic_loaded.to_json(date_format='iso', orient='split') if not df_icic_loaded.empty else None,
         df_canara_loaded.to_json(date_format='iso', orient='split') if not df_canara_loaded.empty else None,
-        df_investments_loaded.to_json(date_format='iso', orient='split') if not df_investments_loaded.empty else None,  # New return
+        df_investments_loaded.to_json(date_format='iso', orient='split') if not df_investments_loaded.empty else None, # New return
         error
     )
 
@@ -859,14 +845,13 @@ def update_load_status_and_filters(stored_icic_data_json, error_message, pathnam
             available_categories = sorted(df_from_store["Category"].unique())
             month_options = [{"label": month, "value": month} for month in available_months]
             category_options = [{"label": cat, "value": cat} for cat in available_categories]
-            
             month_options.insert(0, {"label": "All Months", "value": "ALL_MONTHS"})
             category_options.insert(0, {"label": "All Categories", "value": "ALL_CATEGORIES"})
-
             return dbc.Alert(
                 [html.I(className="bi bi-check-circle-fill me-2"), "Data loaded successfully!"],
                 color="success", className="fade-out"
             ), month_options, category_options
+
     return dbc.Alert(
         [html.I(className="bi bi-hourglass-split me-2"), "Loading data..."],
         color="info", className="fade-in"
@@ -895,7 +880,7 @@ def update_dashboard_content(selected_months, selected_categories, stored_data_j
         return no_update, no_update, no_update, no_update, \
                no_update, no_update, no_update, no_update, \
                no_update, no_update, no_update
-
+    
     empty_figure = go.Figure()
     empty_figure.update_layout(
         template="plotly_dark",
@@ -904,9 +889,7 @@ def update_dashboard_content(selected_months, selected_categories, stored_data_j
         xaxis={"visible": False},
         yaxis={"visible": False},
         annotations=[
-            dict(text="No data available for current selection.",
-                 xref="paper", yref="paper", showarrow=False,
-                 font=dict(size=14, color=CUSTOM_COLOR_PALETTE[0]), align="center")
+            dict(text="No data available for current selection.", xref="paper", yref="paper", showarrow=False, font=dict(size=14, color=CUSTOM_COLOR_PALETTE[0]), align="center")
         ],
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)"
@@ -914,130 +897,161 @@ def update_dashboard_content(selected_months, selected_categories, stored_data_j
 
     if stored_data_json is None:
         return (
-            f"₹0.00", f"₹0.00", "N/A", f"₹0.00", "N/A", f"₹0.00",
-            empty_figure, empty_figure, empty_figure,
-            [], [{"name": "Loading Data...", "id": "loading"}]
+            f"₹0.00",
+            f"₹0.00",
+            "N/A",
+            f"₹0.00",
+            "N/A",
+            f"₹0.00",
+            empty_figure,
+            empty_figure,
+            empty_figure,
+            [],
+            [{"name": "Loading Data...", "id": "loading"}]
         )
 
     df_from_store = pd.read_json(stored_data_json, orient='split')
 
     if df_from_store.empty:
         return (
-            f"₹0.00", f"₹0.00", "N/A", f"₹0.00", "N/A", f"₹0.00",
-            empty_figure, empty_figure, empty_figure,
-            [], [{"name": "No Data", "id": "no_data"}]
+            f"₹0.00",
+            f"₹0.00",
+            "N/A",
+            f"₹0.00",
+            "N/A",
+            f"₹0.00",
+            empty_figure,
+            empty_figure,
+            empty_figure,
+            [],
+            [{"name": "No Data Found", "id": "nodata"}]
         )
+    
+    # Reset filters if "All" is selected
+    if selected_months == ["ALL_MONTHS"] or not selected_months:
+        selected_months = df_from_store["Month"].unique()
+    if selected_categories == ["ALL_CATEGORIES"] or not selected_categories:
+        selected_categories = df_from_store["Category"].unique()
 
-    filtered_df = df_from_store.copy()
-
-    all_available_months = sorted(df_from_store["Month"].unique())
-    all_available_categories = sorted(df_from_store["Category"].unique())
-
-    if selected_months and "ALL_MONTHS" in selected_months:
-        selected_months = all_available_months
-    if selected_categories and "ALL_CATEGORIES" in selected_categories:
-        selected_categories = all_available_categories
-
-    if selected_months:
-        filtered_df = filtered_df[filtered_df["Month"].isin(selected_months)]
-    if selected_categories:
-        filtered_df = filtered_df[filtered_df["Category"].isin(selected_categories)]
+    # Apply filters
+    filtered_df = df_from_store[
+        df_from_store["Month"].isin(selected_months) &
+        df_from_store["Category"].isin(selected_categories)
+    ].copy()
 
     if filtered_df.empty:
         return (
-            f"₹0.00", f"₹0.00", "N/A", f"₹0.00", "N/A", f"₹0.00",
-            empty_figure, empty_figure, empty_figure,
-            [], [{"name": "No Data", "id": "no_data"}]
+            f"₹0.00",
+            f"₹0.00",
+            "N/A",
+            f"₹0.00",
+            "N/A",
+            f"₹0.00",
+            empty_figure,
+            empty_figure,
+            empty_figure,
+            [],
+            [{"name": "No Data Found", "id": "nodata"}]
         )
 
-    # Update KPIs
-    current_total_expenses = filtered_df["Amount"].sum()
-    monthly_summary_filtered = filtered_df.groupby("Month")["Amount"].sum().reset_index()
-    current_avg_monthly = monthly_summary_filtered["Amount"].mean() if not monthly_summary_filtered.empty else 0
+    # --- KPI Calculations ---
+    total_expenses = filtered_df["Amount"].sum()
+    monthly_expenses = filtered_df.groupby("Month")["Amount"].sum().reset_index()
+    avg_monthly_expense = monthly_expenses["Amount"].mean()
+    highest_month = monthly_expenses.loc[monthly_expenses["Amount"].idxmax()]
+    lowest_month = monthly_expenses.loc[monthly_expenses["Amount"].idxmin()]
 
-    if not monthly_summary_filtered.empty:
-        current_highest = monthly_summary_filtered.loc[monthly_summary_filtered["Amount"].idxmax()]
-        current_lowest = monthly_summary_filtered.loc[monthly_summary_filtered["Amount"].idxmin()]
-        highest_kpi_name = current_highest['Month']
-        highest_kpi_value = f"₹{current_highest['Amount']:,.2f}"
-        lowest_kpi_name = current_lowest['Month']
-        lowest_kpi_value = f"₹{current_lowest['Amount']:,.2f}"
-    else:
-        highest_kpi_name = "N/A"
-        highest_kpi_value = f"₹0.00"
-        lowest_kpi_name = "N/A"
-        lowest_kpi_value = f"₹0.00"
-
-    # Update Charts
-    monthly_trend_chart_fig = px.area(
-        monthly_summary_filtered,
-        x="Month", y="Amount",
+    # --- Chart Generation ---
+    # Monthly Expenses Trend Chart
+    trend_chart = px.line(
+        monthly_expenses,
+        x="Month",
+        y="Amount",
         title=f"<span style='color:{CUSTOM_COLOR_PALETTE[0]}'>Monthly Expense Trend</span>",
-        labels={"Amount": "Amount (₹)"},
-        template="plotly_dark",
+        markers=True,
         color_discrete_sequence=[CUSTOM_COLOR_PALETTE[0]],
-        line_shape='spline',
-        hover_name="Month",
-        hover_data={"Amount": ":,.2f"}
-    )
-    monthly_trend_chart_fig.update_layout(xaxis_title=None, yaxis_title="Amount (₹)", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
-    monthly_trend_chart_fig.update_traces(fillcolor="rgba(0, 255, 255, 0.2)", line=dict(width=3, color=CUSTOM_COLOR_PALETTE[0]))
-
-    top_expenses_filtered = filtered_df.groupby("Category")["Amount"].sum().nlargest(5).reset_index()
-    pie_chart_fig = px.pie(
-        top_expenses_filtered,
-        values="Amount", names="Category",
-        title=f"<span style='color:{CUSTOM_COLOR_PALETTE[1]}'>Top Expense Categories</span>",
-        hole=0.4,
+        labels={"Amount": "Amount (₹)", "Month": "Month"},
         template="plotly_dark",
-        color_discrete_sequence=CUSTOM_COLOR_PALETTE
     )
-    pie_chart_fig.update_traces(textinfo="percent+label", pull=[0.05] * len(top_expenses_filtered), marker=dict(line=dict(color='rgba(0,0,0,0)', width=1)))
-    pie_chart_fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
+    trend_chart.update_layout(
+        title_x=0.5,
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        font=dict(color=CUSTOM_COLOR_PALETTE[0]),
+        yaxis_title="Amount (₹)",
+        xaxis_title="Month",
+    )
+    trend_chart.update_traces(line=dict(width=3, color=CUSTOM_COLOR_PALETTE[0]), marker=dict(size=8, symbol='circle'))
 
-    monthly_category_chart_fig = px.bar(
-        filtered_df,
-        x="Month", y="Amount", color="Category",
-        title=f"<span style='color:{CUSTOM_COLOR_PALETTE[2]}'>Monthly Expenses by Category</span>",
-        labels={"Amount": "Amount (₹)", "Category": "Expense Category"},
+    # Top Expense Categories Pie Chart
+    category_summary = filtered_df.groupby("Category")["Amount"].sum().reset_index().sort_values(by="Amount", ascending=False)
+    pie_chart = px.pie(
+        category_summary,
+        values="Amount",
+        names="Category",
+        title=f"<span style='color:{CUSTOM_COLOR_PALETTE[1]}'>Expense Distribution by Category</span>",
+        color_discrete_sequence=CUSTOM_COLOR_PALETTE,
         template="plotly_dark",
-        barmode="relative",
-        color_discrete_sequence=CUSTOM_COLOR_PALETTE
     )
-    monthly_category_chart_fig.update_layout(xaxis_title=None, yaxis_title="Amount (₹)", plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
+    pie_chart.update_layout(
+        title_x=0.5,
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        font=dict(color=CUSTOM_COLOR_PALETTE[0]),
+    )
+    pie_chart.update_traces(textposition='inside', textinfo='percent+label', marker=dict(line=dict(color='#000000', width=1)))
 
-    pivot_filtered = (
-        filtered_df.pivot_table(index="Category", columns="Month", values="Amount", aggfunc="sum", fill_value=0)
-        .reset_index()
+    # Monthly Expenses by Category Bar Chart
+    monthly_category_summary = filtered_df.groupby(["Month", "Category"])["Amount"].sum().reset_index()
+    bar_chart = px.bar(
+        monthly_category_summary,
+        x="Month",
+        y="Amount",
+        color="Category",
+        title=f"<span style='color:{CUSTOM_COLOR_PALETTE[2]}'>Monthly Expenses Breakdown by Category</span>",
+        barmode="group",
+        color_discrete_sequence=CUSTOM_COLOR_PALETTE,
+        labels={"Amount": "Amount (₹)", "Month": "Month", "Category": "Category"},
+        template="plotly_dark",
     )
-    table_data = pivot_filtered.to_dict("records")
-    table_columns = [{"name": c, "id": c} for c in pivot_filtered.columns]
+    bar_chart.update_layout(
+        title_x=0.5,
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        font=dict(color=CUSTOM_COLOR_PALETTE[0]),
+        yaxis_title="Amount (₹)",
+        xaxis_title="Month",
+    )
+    
+    # Update Data Table
+    table_data = filtered_df.to_dict('records')
+    table_columns = [{"name": i, "id": i} for i in filtered_df.columns]
 
     return (
-        f"₹{current_total_expenses:,.2f}",
-        f"₹{current_avg_monthly:,.2f}",
-        highest_kpi_name,
-        highest_kpi_value,
-        lowest_kpi_name,
-        lowest_kpi_value,
-        monthly_trend_chart_fig,
-        pie_chart_fig,
-        monthly_category_chart_fig,
+        f"₹{total_expenses:,.2f}",
+        f"₹{avg_monthly_expense:,.2f}",
+        f"{highest_month['Month']}",
+        f"₹{highest_month['Amount']:,.2f}",
+        f"{lowest_month['Month']}",
+        f"₹{lowest_month['Amount']:,.2f}",
+        trend_chart,
+        pie_chart,
+        bar_chart,
         table_data,
         table_columns
     )
 
 # Callback to populate savings filter dropdowns
 @app.callback(
-    Output('savings-month-filter', 'options'),
-    Output('savings-category-filter', 'options'),
-    Input('stored-canara-data', 'data'),
+    Output("savings-month-filter", "options"),
+    Output("savings-category-filter", "options"),
+    Input("stored-canara-data", "data"),
     State('url', 'pathname')
 )
-def populate_savings_filters(stored_canara_data_json, pathname):
+def update_savings_filters(stored_canara_data_json, pathname):
     if pathname != '/savings':
         return no_update, no_update
-
+        
     available_months = []
     available_categories = []
 
@@ -1046,48 +1060,15 @@ def populate_savings_filters(stored_canara_data_json, pathname):
         if not df_from_store.empty:
             available_months = sorted(df_from_store["Month"].unique())
             available_categories = sorted(df_from_store["Category"].unique())
-            
-            month_options = [{"label": month, "value": month} for month in available_months]
-            category_options = [{"label": cat, "value": cat} for cat in available_categories]
-            
-            month_options.insert(0, {"label": "All Months", "value": "ALL_MONTHS"})
-            category_options.insert(0, {"label": "All Categories", "value": "ALL_CATEGORIES"})
 
-            return month_options, category_options
-    
-    return [], []
+    month_options = [{"label": month, "value": month} for month in available_months]
+    category_options = [{"label": cat, "value": cat} for cat in available_categories]
+    month_options.insert(0, {"label": "All Months", "value": "ALL_MONTHS"})
+    category_options.insert(0, {"label": "All Categories", "value": "ALL_CATEGORIES"})
 
-# Callback to populate investments filter dropdowns
-@app.callback(
-    Output('investments-month-filter', 'options'),
-    Output('investments-category-filter', 'options'),
-    Input('stored-investments-data', 'data'),
-    State('url', 'pathname')
-)
-def populate_investments_filters(stored_investments_data_json, pathname):
-    if pathname != '/investments':
-        return no_update, no_update
+    return month_options, category_options
 
-    available_months = []
-    available_categories = []
-
-    if stored_investments_data_json:
-        df_from_store = pd.read_json(stored_investments_data_json, orient='split')
-        if not df_from_store.empty:
-            available_months = sorted(df_from_store["Month"].unique())
-            available_categories = sorted(df_from_store["Category"].unique())
-            
-            month_options = [{"label": month, "value": month} for month in available_months]
-            category_options = [{"label": cat, "value": cat} for cat in available_categories]
-            
-            month_options.insert(0, {"label": "All Months", "value": "ALL_MONTHS"})
-            category_options.insert(0, {"label": "All Categories", "value": "ALL_CATEGORIES"})
-
-            return month_options, category_options
-    
-    return [], []
-
-# Callback to update Savings Monitor KPIs, Graphs, and Table
+# Callback for Savings Monitor KPIs, Chart, and Table
 @app.callback(
     Output("total-savings-credit-kpi", "children"),
     Output("total-savings-debit-kpi", "children"),
@@ -1096,351 +1077,120 @@ def populate_investments_filters(stored_investments_data_json, pathname):
     Output("savings-category-bar-chart", "figure"),
     Output("savings-data-table", "data"),
     Output("savings-data-table", "columns"),
-    Input("stored-canara-data", "data"),
     Input("savings-month-filter", "value"),
     Input("savings-category-filter", "value"),
-    Input("savings-reset-filters-button", "n_clicks"),
+    Input("stored-canara-data", "data"),
     State('url', 'pathname')
 )
-def update_savings_monitor_content(stored_canara_data_json, selected_months, selected_categories, n_clicks, pathname):
+def update_savings_content(selected_months, selected_categories, stored_data_json, pathname):
     if pathname != '/savings':
-        return no_update, no_update, no_update, \
-               no_update, no_update, no_update, no_update
-
+        return no_update, no_update, no_update, no_update, \
+               no_update, no_update, no_update
+    
     empty_figure = go.Figure()
     empty_figure.update_layout(
         template="plotly_dark",
-        title_text=f"<span style='color:{CUSTOM_COLOR_PALETTE[0]}'>Savings Data Not Found </span><br> <span style='font-size:12px;color:{CUSTOM_COLOR_PALETTE[5]}'>Check data source.</span>",
+        title_text=f"<span style='color:{CUSTOM_COLOR_PALETTE[0]}'>Data Not Found </span><br> <span style='font-size:12px;color:{CUSTOM_COLOR_PALETTE[5]}'>Adjust filters or check data source.</span>",
         height=300,
         xaxis={"visible": False},
         yaxis={"visible": False},
         annotations=[
-            dict(text="No savings data available.",
-                 xref="paper", yref="paper", showarrow=False,
-                 font=dict(size=14, color=CUSTOM_COLOR_PALETTE[0]), align="center")
+            dict(text="No data available for current selection.", xref="paper", yref="paper", showarrow=False, font=dict(size=14, color=CUSTOM_COLOR_PALETTE[0]), align="center")
         ],
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)"
     )
 
-    if stored_canara_data_json is None:
+    if stored_data_json is None:
         return (
-            f"₹0.00", f"₹0.00", f"₹0.00",
-            empty_figure, empty_figure,
-            [], [{"name": "Loading Data...", "id": "loading"}]
+            f"₹0.00", f"₹0.00", f"₹0.00", empty_figure, empty_figure, [],
+            [{"name": "Loading Data...", "id": "loading"}]
         )
 
-    df_canara_from_store = pd.read_json(stored_canara_data_json, orient='split')
-
-    if df_canara_from_store.empty:
+    df_from_store = pd.read_json(stored_data_json, orient='split')
+    if df_from_store.empty:
         return (
-            f"₹0.00", f"₹0.00", f"₹0.00",
-            empty_figure, empty_figure,
-            [], [{"name": "No Data", "id": "no_data"}]
+            f"₹0.00", f"₹0.00", f"₹0.00", empty_figure, empty_figure, [],
+            [{"name": "No Data Found", "id": "nodata"}]
         )
 
-    filtered_df = df_canara_from_store.copy()
+    # Reset filters if "All" is selected
+    if selected_months == ["ALL_MONTHS"] or not selected_months:
+        selected_months = df_from_store["Month"].unique()
+    if selected_categories == ["ALL_CATEGORIES"] or not selected_categories:
+        selected_categories = df_from_store["Category"].unique()
 
-    all_available_months = sorted(df_canara_from_store["Month"].unique())
-    all_available_categories = sorted(df_canara_from_store["Category"].unique())
-
-    if selected_months and "ALL_MONTHS" in selected_months:
-        selected_months = all_available_months
-    if selected_categories and "ALL_CATEGORIES" in selected_categories:
-        selected_categories = all_available_categories
-
-    if selected_months:
-        filtered_df = filtered_df[filtered_df["Month"].isin(selected_months)]
-    if selected_categories:
-        filtered_df = filtered_df[filtered_df["Category"].isin(selected_categories)]
+    # Apply filters
+    filtered_df = df_from_store[
+        df_from_store["Month"].isin(selected_months) &
+        df_from_store["Category"].isin(selected_categories)
+    ].copy()
 
     if filtered_df.empty:
         return (
-            f"₹0.00", f"₹0.00", f"₹0.00",
-            empty_figure, empty_figure,
-            [], [{"name": "No Data", "id": "no_data"}]
+            f"₹0.00", f"₹0.00", f"₹0.00", empty_figure, empty_figure, [],
+            [{"name": "No Data Found", "id": "nodata"}]
         )
 
-    total_credit = filtered_df["Credit"].sum()
-    total_debit = filtered_df["Debit"].sum()
+    # KPI Calculations
+    total_credit = filtered_df['Credit'].sum()
+    total_debit = filtered_df['Debit'].sum()
     net_savings = total_credit - total_debit
 
-    monthly_savings_summary = filtered_df.groupby("Month").agg(
-        Total_Credit=("Credit", "sum"),
-        Total_Debit=("Debit", "sum")
-    ).reset_index()
-    monthly_savings_summary["Net_Savings"] = monthly_savings_summary["Total_Credit"] - monthly_savings_summary["Total_Debit"]
+    # Monthly Trend Chart
+    monthly_trend = filtered_df.groupby("Month")[['Credit', 'Debit']].sum().reset_index()
+    monthly_trend['Net Savings'] = monthly_trend['Credit'] - monthly_trend['Debit']
 
-    savings_trend_fig = go.Figure()
-    savings_trend_fig.add_trace(go.Scatter(
-        x=monthly_savings_summary["Month"], y=monthly_savings_summary["Total_Credit"],
-        mode='lines+markers', name='Total Credit', line=dict(color=CUSTOM_COLOR_PALETTE[2], width=3)
-    ))
-    savings_trend_fig.add_trace(go.Scatter(
-        x=monthly_savings_summary["Month"], y=monthly_savings_summary["Total_Debit"],
-        mode='lines+markers', name='Total Debit', line=dict(color=CUSTOM_COLOR_PALETTE[1], width=3)
-    ))
-    savings_trend_fig.add_trace(go.Scatter(
-        x=monthly_savings_summary["Month"], y=monthly_savings_summary["Net_Savings"],
-        mode='lines+markers', name='Net Savings', line=dict(color=CUSTOM_COLOR_PALETTE[0], width=3, dash='dash')
-    ))
-
-    savings_trend_fig.update_layout(
+    trend_chart = go.Figure()
+    trend_chart.add_trace(go.Bar(x=monthly_trend['Month'], y=monthly_trend['Credit'], name='Credit', marker_color=CUSTOM_COLOR_PALETTE[0]))
+    trend_chart.add_trace(go.Bar(x=monthly_trend['Month'], y=monthly_trend['Debit'], name='Debit', marker_color=CUSTOM_COLOR_PALETTE[1]))
+    trend_chart.update_layout(
+        title=f"<span style='color:{CUSTOM_COLOR_PALETTE[0]}'>Monthly Credit & Debit Trend</span>",
         template="plotly_dark",
-        title=f"<span style='color:{CUSTOM_COLOR_PALETTE[0]}'>Monthly Savings Trend</span>",
-        xaxis_title=None,
-        yaxis_title="Amount (₹)",
+        barmode='group',
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
-        hovermode="x unified"
-    )
-
-    category_summary = filtered_df.groupby("Category").agg(
-        Total_Credit=("Credit", "sum"),
-        Total_Debit=("Debit", "sum")
-    ).reset_index()
-
-    savings_category_fig = go.Figure(data=[
-        go.Bar(name='Total Credit', x=category_summary['Category'], y=category_summary['Total_Credit'], marker_color=CUSTOM_COLOR_PALETTE[2]),
-        go.Bar(name='Total Debit', x=category_summary['Category'], y=category_summary['Total_Debit'], marker_color=CUSTOM_COLOR_PALETTE[1])
-    ])
-    savings_category_fig.update_layout(
-        barmode='group',
-        template="plotly_dark",
-        title=f"<span style='color:{CUSTOM_COLOR_PALETTE[1]}'>Savings by Category (Credit vs. Debit)</span>",
-        xaxis_title="Category",
+        title_x=0.5,
+        font=dict(color=CUSTOM_COLOR_PALETTE[0]),
         yaxis_title="Amount (₹)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)"
+        xaxis_title="Month"
     )
 
-    canara_table_data = filtered_df.to_dict("records")
-    canara_table_columns = [{"name": col, "id": col} for col in filtered_df.columns]
+    # Savings by Category Bar Chart
+    category_summary = filtered_df.groupby('Category')[['Credit', 'Debit']].sum().reset_index()
+    category_summary['Net'] = category_summary['Credit'] - category_summary['Debit']
+    category_chart = px.bar(
+        category_summary,
+        x='Category',
+        y='Net',
+        color='Net',
+        title=f"<span style='color:{CUSTOM_COLOR_PALETTE[1]}'>Net Savings by Category</span>",
+        template="plotly_dark",
+        color_continuous_scale=px.colors.sequential.Viridis,
+        labels={'Net': 'Net Amount (₹)'}
+    )
+    category_chart.update_layout(
+        title_x=0.5,
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        font=dict(color=CUSTOM_COLOR_PALETTE[0]),
+        yaxis_title="Net Amount (₹)",
+        xaxis_title="Category"
+    )
+
+    # Data Table
+    table_data = filtered_df.to_dict('records')
+    table_columns = [{"name": i, "id": i} for i in filtered_df.columns]
 
     return (
         f"₹{total_credit:,.2f}",
         f"₹{total_debit:,.2f}",
         f"₹{net_savings:,.2f}",
-        savings_trend_fig,
-        savings_category_fig,
-        canara_table_data,
-        canara_table_columns
-    )
-
-# Callback to update Investments KPIs, Graphs, and Table
-@app.callback(
-    Output("total-investments-kpi", "children"),
-    Output("avg-monthly-investment-kpi", "children"),
-    Output("highest-category-kpi-name", "children"),
-    Output("highest-category-kpi-value", "children"),
-    Output("lowest-category-kpi-name", "children"),
-    Output("lowest-category-kpi-value", "children"),
-    Output("lic-installments-kpi", "children"),
-    Output("kumaran-installments-kpi", "children"),
-    Output("thangamayil-installments-kpi", "children"),
-    Output("investments-monthly-trend-chart", "figure"),
-    Output("investments-categories-chart", "figure"),
-    Output("investments-by-category-chart", "figure"),
-    Output("investments-data-table", "data"),
-    Output("investments-data-table", "columns"),
-    Input("stored-investments-data", "data"),
-    Input("investments-month-filter", "value"),
-    Input("investments-category-filter", "value"),
-    Input("investments-reset-filters-button", "n_clicks"),
-    Input('url', 'pathname')  # ADDED: This line is the fix
-)
-def update_investments_content(stored_investments_data_json, selected_months, selected_categories, n_clicks, pathname):
-    if pathname != '/investments':
-        return no_update, no_update, no_update, no_update, \
-               no_update, no_update, no_update, no_update, \
-               no_update, no_update, no_update, no_update, \
-               no_update, no_update
-
-    empty_figure = go.Figure()
-    empty_figure.update_layout(
-        template="plotly_dark",
-        title_text=f"<span style='color:{CUSTOM_COLOR_PALETTE[0]}'>Investments Data Not Found </span><br> <span style='font-size:12px;color:{CUSTOM_COLOR_PALETTE[5]}'>Check data source.</span>",
-        height=300,
-        xaxis={"visible": False},
-        yaxis={"visible": False},
-        annotations=[
-            dict(text="No investments data available.",
-                 xref="paper", yref="paper", showarrow=False,
-                 font=dict(size=14, color=CUSTOM_COLOR_PALETTE[0]), align="center")
-        ],
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)"
-    )
-
-    if stored_investments_data_json is None:
-        return (
-            f"₹0.00", f"₹0.00", "N/A", f"₹0.00", "N/A", f"₹0.00",
-            "N/A", "N/A", "N/A",
-            empty_figure, empty_figure, empty_figure,
-            [], [{"name": "Loading Data...", "id": "loading"}]
-        )
-
-    df_investments_from_store = pd.read_json(stored_investments_data_json, orient='split')
-
-    if df_investments_from_store.empty:
-        return (
-            f"₹0.00", f"₹0.00", "N/A", f"₹0.00", "N/A", f"₹0.00",
-            "N/A", "N/A", "N/A",
-            empty_figure, empty_figure, empty_figure,
-            [], [{"name": "No Data", "id": "no_data"}]
-        )
-
-    filtered_df = df_investments_from_store.copy()
-
-    all_available_months = sorted(filtered_df["Month"].unique())
-    all_available_categories = sorted(filtered_df["Category"].unique())
-
-    if selected_months and "ALL_MONTHS" in selected_months:
-        selected_months = all_available_months
-    if selected_categories and "ALL_CATEGORIES" in selected_categories:
-        selected_categories = all_available_categories
-
-    if selected_months:
-        filtered_df = filtered_df[filtered_df["Month"].isin(selected_months)]
-    if selected_categories:
-        filtered_df = filtered_df[filtered_df["Category"].isin(selected_categories)]
-
-    if filtered_df.empty:
-        return (
-            f"₹0.00", f"₹0.00", "N/A", f"₹0.00", "N/A", f"₹0.00",
-            "N/A", "N/A", "N/A",
-            empty_figure, empty_figure, empty_figure,
-            [], [{"name": "No Data", "id": "no_data"}]
-        )
-
-    # Update KPIs
-    current_total_investments = filtered_df["Amount"].sum()
-    monthly_summary_filtered = filtered_df.groupby("Month")["Amount"].sum().reset_index()
-    current_avg_monthly = monthly_summary_filtered["Amount"].mean() if not monthly_summary_filtered.empty else 0
-
-    category_summary = filtered_df.groupby("Category")["Amount"].sum().reset_index()
-    if not category_summary.empty:
-        current_highest = category_summary.loc[category_summary["Amount"].idxmax()]
-        current_lowest = category_summary.loc[category_summary["Amount"].idxmin()]
-        highest_kpi_name = current_highest['Category']
-        highest_kpi_value = f"₹{current_highest['Amount']:,.2f}"
-        lowest_kpi_name = current_lowest['Category']
-        lowest_kpi_value = f"₹{current_lowest['Amount']:,.2f}"
-    else:
-        highest_kpi_name = "N/A"
-        highest_kpi_value = f"₹0.00"
-        lowest_kpi_name = "N/A"
-        lowest_kpi_value = f"₹0.00"
-
-    # --- New KPI Calculations for Installments ---
-    lic_total_months = 15 * 12
-    kumaran_total_months = 11
-    thangamayil_total_months = 11
-
-    lic_paid = filtered_df[filtered_df['Category'] == 'LIC'].shape[0]
-    kumaran_paid = filtered_df[filtered_df['Category'] == 'KUMARAN'].shape[0]
-    thangamayil_paid = filtered_df[filtered_df['Category'] == 'THANGAMAYIL'].shape[0]
-    
-    lic_remaining = max(0, lic_total_months - lic_paid)
-    kumaran_remaining = max(0, kumaran_total_months - kumaran_paid)
-    thangamayil_remaining = max(0, thangamayil_total_months - thangamayil_paid)
-
-    # Update Charts
-    monthly_trend_chart_fig = px.area(
-        monthly_summary_filtered,
-        x="Month", y="Amount",
-        title=f"<span style='color:{CUSTOM_COLOR_PALETTE[0]}'>Monthly Investment Trend</span>",
-        labels={"Amount": "Amount (₹)"},
-        template="plotly_dark",
-        color_discrete_sequence=[CUSTOM_COLOR_PALETTE[4]],  # RoyalBlue
-        line_shape='spline',
-        hover_name="Month",
-        hover_data={"Amount": ":,.2f"}
-    )
-    monthly_trend_chart_fig.update_layout(xaxis_title=None, yaxis_title="Amount (₹)", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
-    monthly_trend_chart_fig.update_traces(fillcolor="rgba(65, 105, 225, 0.2)", line=dict(width=3, color=CUSTOM_COLOR_PALETTE[4]))
-
-    pie_chart_fig = px.pie(
-        category_summary,
-        values="Amount", names="Category",
-        title=f"<span style='color:{CUSTOM_COLOR_PALETTE[1]}'>Investment Categories</span>",
-        hole=0.4,
-        template="plotly_dark",
-        color_discrete_sequence=CUSTOM_COLOR_PALETTE
-    )
-    pie_chart_fig.update_traces(textinfo="percent+label", pull=[0.05] * len(category_summary), marker=dict(line=dict(color='rgba(0,0,0,0)', width=1)))
-    pie_chart_fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
-
-    category_monthly_chart_fig = px.bar(
-        filtered_df,
-        x="Month", y="Amount", color="Category",
-        title=f"<span style='color:{CUSTOM_COLOR_PALETTE[2]}'>Monthly Investments by Category</span>",
-        labels={"Amount": "Amount (₹)", "Category": "Investment Category"},
-        template="plotly_dark",
-        barmode="stack",
-        color_discrete_sequence=CUSTOM_COLOR_PALETTE
-    )
-    category_monthly_chart_fig.update_layout(xaxis_title=None, yaxis_title="Amount (₹)", plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
-
-    pivot_filtered = (
-        filtered_df.pivot_table(index="Category", columns="Month", values="Amount", aggfunc="sum", fill_value=0)
-        .reset_index()
-    )
-    table_data = pivot_filtered.to_dict("records")
-    table_columns = [{"name": c, "id": c} for c in pivot_filtered.columns]
-
-    return (
-        f"₹{current_total_investments:,.2f}",
-        f"₹{current_avg_monthly:,.2f}",
-        highest_kpi_name,
-        highest_kpi_value,
-        lowest_kpi_name,
-        lowest_kpi_value,
-        f"{lic_remaining} of {lic_total_months}",
-        f"{kumaran_remaining} of {kumaran_total_months}",
-        f"{thangamayil_remaining} of {thangamayil_total_months}",
-        monthly_trend_chart_fig,
-        pie_chart_fig,
-        category_monthly_chart_fig,
+        trend_chart,
+        category_chart,
         table_data,
         table_columns
     )
-
-# Callback to reset filters for Dashboard
-@app.callback(
-    Output("month-filter", "value"),
-    Output("category-filter", "value"),
-    Input("reset-filters-button", "n_clicks"),
-    State('url', 'pathname')
-)
-def reset_filters(n_clicks, pathname):
-    if pathname != '/' or not (n_clicks and n_clicks > 0):
-        return no_update, no_update
-    return [], []
-
-# Callback to reset filters for Savings Monitor
-@app.callback(
-    Output("savings-month-filter", "value"),
-    Output("savings-category-filter", "value"),
-    Input("savings-reset-filters-button", "n_clicks"),
-    State('url', 'pathname')
-)
-def reset_savings_filters(n_clicks, pathname):
-    if pathname != '/savings' or not (n_clicks and n_clicks > 0):
-        return no_update, no_update
-    return [], []
-
-# Callback to reset filters for Investments
-@app.callback(
-    Output("investments-month-filter", "value"),
-    Output("investments-category-filter", "value"),
-    Input("investments-reset-filters-button", "n_clicks"),
-    State('url', 'pathname')
-)
-def reset_investments_filters(n_clicks, pathname):
-    if pathname != '/investments' or not (n_clicks and n_clicks > 0):
-        return no_update, no_update
-    return [], []
 
 # Callback for Savings Goal Calculator
 @app.callback(
@@ -1448,56 +1198,38 @@ def reset_investments_filters(n_clicks, pathname):
     Input("calculate-goal-button", "n_clicks"),
     State("target-amount-input", "value"),
     State("duration-input", "value"),
-    State("stored-canara-data", "data"),
-    prevent_initial_call=True
+    State("stored-canara-data", "data")
 )
-def calculate_savings_goal(n_clicks, target_amount, duration, stored_canara_data_json):
+def calculate_savings_goal(n_clicks, target_amount, duration, stored_data_json):
     if not n_clicks:
         return no_update
 
-    if stored_canara_data_json is None:
-        return html.P("No savings data available to calculate goals.", className="text-danger")
+    if stored_data_json is None:
+        return html.P("Historical data not available for calculation.", className="text-warning")
 
-    df_canara = pd.read_json(stored_canara_data_json, orient='split')
+    df_from_store = pd.read_json(stored_data_json, orient='split')
+    if df_from_store.empty:
+        return html.P("Historical data is empty. Cannot perform calculation.", className="text-warning")
 
-    if df_canara.empty:
-        return html.P("Empty savings data. Cannot calculate goals.", className="text-warning")
-
-    monthly_summary = df_canara.groupby("Month").agg(
-        Total_Credit=("Credit", "sum"),
-        Total_Debit=("Debit", "sum")
-    ).reset_index()
-    monthly_summary["Net_Savings"] = monthly_summary["Total_Credit"] - monthly_summary["Total_Debit"]
-    
-    historical_avg_monthly_net_savings = monthly_summary["Net_Savings"].mean() if not monthly_summary.empty else 0
-
-    target_amount = float(target_amount) if target_amount is not None else None
-    duration = int(duration) if duration is not None else None
+    monthly_summary = df_from_store.groupby('Month')[['Credit', 'Debit']].sum()
+    monthly_summary['Net Savings'] = monthly_summary['Credit'] - monthly_summary['Debit']
+    historical_avg_monthly_net_savings = monthly_summary['Net Savings'].mean()
 
     if target_amount is None and duration is None:
-        return html.P("Please enter a Target Amount, Duration, or both.", className="text-info")
-
-    elif target_amount is not None and duration is not None:
+        return html.P("Please enter either a target amount or a duration.", className="text-info")
+    
+    # Handle both inputs being provided
+    if target_amount is not None and duration is not None:
         if duration <= 0:
-            return html.P("Duration must be a positive number of months.", className="text-danger")
-        required_monthly_savings = target_amount / duration
+             return html.P("Duration must be a positive number of months.", className="text-danger")
         
-        output_message = f"To save ₹{target_amount:,.2f} in {duration} months, you need to save " \
-                         f"₹{required_monthly_savings:,.2f} per month. <br>"
+        target_per_month = target_amount / duration
+        historical_monthly_output = f"Your historical average monthly net savings is **₹{historical_avg_monthly_net_savings:,.2f}**." if historical_avg_monthly_net_savings > 0 else "Your historical average monthly net savings is **₹0.00** or less."
         
-        if historical_avg_monthly_net_savings > 0:
-            output_message += f"Your historical average monthly net savings is ₹{historical_avg_monthly_net_savings:,.2f}. "
-            if required_monthly_savings > historical_avg_monthly_net_savings:
-                diff = required_monthly_savings - historical_avg_monthly_net_savings
-                output_message += f"You need to increase your monthly savings by ₹{diff:,.2f}."
-            elif required_monthly_savings < historical_avg_monthly_net_savings:
-                diff = historical_avg_monthly_net_savings - required_monthly_savings
-                output_message += f"You are currently saving ₹{diff:,.2f} more than needed for this goal!"
-            else:
-                output_message += "You are on track to meet this goal with your current savings rate!"
-        else:
-             output_message += "Your historical average monthly net savings is ₹0.00. You need to start saving!"
-        
+        output_message = html.Div([
+            html.P(f"To save **₹{target_amount:,.2f}** in **{duration}** months, you need to save **₹{target_per_month:,.2f}** per month."),
+            html.P(historical_monthly_output)
+        ])
         return html.P(output_message)
 
     elif target_amount is not None:
@@ -1524,7 +1256,183 @@ def calculate_savings_goal(n_clicks, target_amount, duration, stored_canara_data
             f"you will save approximately ₹{projected_savings:,.2f} in {duration} months."
         )
     
-    return html.P("Please enter valid numbers for target amount and/or duration.", className="text-danger")
+    return html.P("Please enter either a target amount or a duration to calculate.", className="text-info")
 
-if __name__ == "__main__":
-    app.run_server(debug=True)
+# Callback to populate investments filter dropdowns and update content
+@app.callback(
+    Output("investments-month-filter", "options"),
+    Output("investments-category-filter", "options"),
+    Output("total-investments-kpi", "children"),
+    Output("avg-monthly-investment-kpi", "children"),
+    Output("highest-category-kpi-name", "children"),
+    Output("highest-category-kpi-value", "children"),
+    Output("lowest-category-kpi-name", "children"),
+    Output("lowest-category-kpi-value", "children"),
+    Output("investments-monthly-trend-chart", "figure"),
+    Output("investments-categories-chart", "figure"),
+    Output("investments-by-category-chart", "figure"),
+    Output("investments-data-table", "data"),
+    Output("investments-data-table", "columns"),
+    Input("investments-month-filter", "value"),
+    Input("investments-category-filter", "value"),
+    Input("stored-investments-data", "data"),
+    State('url', 'pathname')
+)
+def update_investments_content(selected_months, selected_categories, stored_data_json, pathname):
+    if pathname != '/investments':
+        return no_update, no_update, no_update, no_update, \
+               no_update, no_update, no_update, no_update, \
+               no_update, no_update, no_update, no_update, no_update
+    
+    empty_figure = go.Figure()
+    empty_figure.update_layout(
+        template="plotly_dark",
+        title_text=f"<span style='color:{CUSTOM_COLOR_PALETTE[0]}'>Data Not Found </span><br> <span style='font-size:12px;color:{CUSTOM_COLOR_PALETTE[5]}'>Adjust filters or check data source.</span>",
+        height=300,
+        xaxis={"visible": False},
+        yaxis={"visible": False},
+        annotations=[
+            dict(text="No data available for current selection.", xref="paper", yref="paper", showarrow=False, font=dict(size=14, color=CUSTOM_COLOR_PALETTE[0]), align="center")
+        ],
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)"
+    )
+
+    if stored_data_json is None:
+        return (
+            [], [], f"₹0.00", f"₹0.00", "N/A", f"₹0.00", "N/A", f"₹0.00", 
+            empty_figure, empty_figure, empty_figure, [], 
+            [{"name": "Loading Data...", "id": "loading"}]
+        )
+
+    df_from_store = pd.read_json(stored_data_json, orient='split')
+    
+    # Update filter options first, regardless of if the data is empty
+    available_months = []
+    available_categories = []
+    if not df_from_store.empty:
+        available_months = sorted(df_from_store["Month"].unique())
+        available_categories = sorted(df_from_store["Category"].unique())
+    month_options = [{"label": month, "value": month} for month in available_months]
+    category_options = [{"label": cat, "value": cat} for cat in available_categories]
+    month_options.insert(0, {"label": "All Months", "value": "ALL_MONTHS"})
+    category_options.insert(0, {"label": "All Categories", "value": "ALL_CATEGORIES"})
+
+    if df_from_store.empty:
+        return (
+            month_options, category_options, f"₹0.00", f"₹0.00", "N/A", f"₹0.00", "N/A", f"₹0.00",
+            empty_figure, empty_figure, empty_figure, [],
+            [{"name": "No Data Found", "id": "nodata"}]
+        )
+    
+    # Reset filters if "All" is selected
+    if selected_months == ["ALL_MONTHS"] or not selected_months:
+        selected_months = df_from_store["Month"].unique()
+    if selected_categories == ["ALL_CATEGORIES"] or not selected_categories:
+        selected_categories = df_from_store["Category"].unique()
+
+    # Apply filters
+    filtered_df = df_from_store[
+        df_from_store["Month"].isin(selected_months) &
+        df_from_store["Category"].isin(selected_categories)
+    ].copy()
+
+    if filtered_df.empty:
+        return (
+            month_options, category_options, f"₹0.00", f"₹0.00", "N/A", f"₹0.00", "N/A", f"₹0.00",
+            empty_figure, empty_figure, empty_figure, [],
+            [{"name": "No Data Found", "id": "nodata"}]
+        )
+
+    # KPI Calculations
+    total_investments = filtered_df["Amount"].sum()
+    monthly_investments = filtered_df.groupby("Month")["Amount"].sum().reset_index()
+    avg_monthly_investment = monthly_investments["Amount"].mean()
+    category_summary = filtered_df.groupby("Category")["Amount"].sum().reset_index()
+    
+    highest_category = category_summary.loc[category_summary["Amount"].idxmax()]
+    lowest_category = category_summary.loc[category_summary["Amount"].idxmin()]
+    
+    # Charts
+    # Monthly Investments Trend Chart
+    trend_chart = px.line(
+        monthly_investments,
+        x="Month",
+        y="Amount",
+        title=f"<span style='color:{CUSTOM_COLOR_PALETTE[0]}'>Monthly Investment Trend</span>",
+        markers=True,
+        color_discrete_sequence=[CUSTOM_COLOR_PALETTE[0]],
+        labels={"Amount": "Amount (₹)", "Month": "Month"},
+        template="plotly_dark",
+    )
+    trend_chart.update_layout(
+        title_x=0.5,
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        font=dict(color=CUSTOM_COLOR_PALETTE[0]),
+        yaxis_title="Amount (₹)",
+        xaxis_title="Month",
+    )
+    trend_chart.update_traces(line=dict(width=3, color=CUSTOM_COLOR_PALETTE[0]), marker=dict(size=8, symbol='circle'))
+
+    # Investment Categories Pie Chart
+    pie_chart = px.pie(
+        category_summary,
+        values="Amount",
+        names="Category",
+        title=f"<span style='color:{CUSTOM_COLOR_PALETTE[1]}'>Investment Distribution by Category</span>",
+        color_discrete_sequence=CUSTOM_COLOR_PALETTE,
+        template="plotly_dark",
+    )
+    pie_chart.update_layout(
+        title_x=0.5,
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        font=dict(color=CUSTOM_COLOR_PALETTE[0]),
+    )
+    pie_chart.update_traces(textposition='inside', textinfo='percent+label', marker=dict(line=dict(color='#000000', width=1)))
+
+    # Investments by Category Bar Chart
+    monthly_category_summary = filtered_df.groupby(["Month", "Category"])["Amount"].sum().reset_index()
+    bar_chart = px.bar(
+        monthly_category_summary,
+        x="Month",
+        y="Amount",
+        color="Category",
+        title=f"<span style='color:{CUSTOM_COLOR_PALETTE[2]}'>Monthly Investments Breakdown by Category</span>",
+        barmode="group",
+        color_discrete_sequence=CUSTOM_COLOR_PALETTE,
+        labels={"Amount": "Amount (₹)", "Month": "Month", "Category": "Category"},
+        template="plotly_dark",
+    )
+    bar_chart.update_layout(
+        title_x=0.5,
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        font=dict(color=CUSTOM_COLOR_PALETTE[0]),
+        yaxis_title="Amount (₹)",
+        xaxis_title="Month",
+    )
+
+    # Data Table
+    table_data = filtered_df.to_dict('records')
+    table_columns = [{"name": i, "id": i} for i in filtered_df.columns]
+
+    return (
+        month_options,
+        category_options,
+        f"₹{total_investments:,.2f}",
+        f"₹{avg_monthly_investment:,.2f}",
+        f"{highest_category['Category']}",
+        f"₹{highest_category['Amount']:,.2f}",
+        f"{lowest_category['Category']}",
+        f"₹{lowest_category['Amount']:,.2f}",
+        trend_chart,
+        pie_chart,
+        bar_chart,
+        table_data,
+        table_columns
+    )
+
+if __name__ == '__main__':
+    app.run_server(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 8050)))
