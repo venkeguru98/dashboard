@@ -423,9 +423,13 @@ def display_page(pathname):
     Output('overview-data-table', 'columns'),
     Input('month-filter', 'value'),
     Input('category-filter', 'value'),
+    Input('url', 'pathname'),  # Added URL input
     State('stored-icic-data', 'data')
 )
-def update_dashboard_content(months, categories, icic_json):
+def update_dashboard_content(months, categories, pathname, icic_json):
+    if pathname != '/':
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+        
     empty_kpi = "₹0.00"
     empty_text = "N/A"
     empty_fig = go.Figure()
@@ -512,9 +516,13 @@ def update_dashboard_content(months, categories, icic_json):
     Output('savings-data-table', 'columns'),
     Input('savings-month-filter', 'value'),
     Input('savings-category-filter', 'value'),
+    Input('url', 'pathname'),  # Added URL input
     State('stored-canara-data', 'data')
 )
-def update_savings_content(months, categories, canara_json):
+def update_savings_content(months, categories, pathname, canara_json):
+    if pathname != '/savings':
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+
     empty_kpi = "₹0.00"
     empty_fig = go.Figure()
     empty_list = []
@@ -590,9 +598,13 @@ def update_savings_content(months, categories, canara_json):
     Output("thangamayil-installments-kpi", "children"),
     Input('investments-month-filter', 'value'),
     Input('investments-category-filter', 'value'),
+    Input('url', 'pathname'),  # Added URL input
     State('stored-investments-data', 'data')
 )
-def update_investments_content(months, categories, invest_json):
+def update_investments_content(months, categories, pathname, invest_json):
+    if pathname != '/investments':
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+        
     empty_kpi = "₹0.00"
     empty_text = "N/A"
     empty_fig = go.Figure()
