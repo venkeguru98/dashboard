@@ -1350,13 +1350,8 @@ def update_investments_content(selected_months, selected_categories, stored_data
     avg_monthly_investment = monthly_investments["Amount"].mean()
     category_summary = filtered_df.groupby("Category")["Amount"].sum().reset_index()
     
-    # Check if there's any investment data before finding max/min
-    if not category_summary.empty and category_summary["Amount"].sum() > 0:
-        highest_category = category_summary.loc[category_summary["Amount"].idxmax()]
-        lowest_category = category_summary.loc[category_summary["Amount"].idxmin()]
-    else:
-        highest_category = {'Category': 'N/A', 'Amount': 0}
-        lowest_category = {'Category': 'N/A', 'Amount': 0}
+    highest_category = category_summary.loc[category_summary["Amount"].idxmax()]
+    lowest_category = category_summary.loc[category_summary["Amount"].idxmin()]
     
     # Charts
     # Monthly Investments Trend Chart
@@ -1422,20 +1417,6 @@ def update_investments_content(selected_months, selected_categories, stored_data
     # Data Table
     table_data = filtered_df.to_dict('records')
     table_columns = [{"name": i, "id": i} for i in filtered_df.columns]
-    
-    # New - Calculate remaining installments
-    def calculate_remaining(df, category_name, total_installments):
-        if df.empty or category_name not in df['Category'].unique():
-            return "N/A"
-        
-        current_investments = df[df['Category'] == category_name]['Amount'].count()
-        remaining = total_installments - current_investments
-        return f"{remaining}" if remaining >= 0 else "Completed!"
-
-    lic_left = calculate_remaining(df_from_store, "LIC", 15)
-    kumaran_left = calculate_remaining(df_from_store, "KUMARAN", 10)
-    thangamayil_left = calculate_remaining(df_from_store, "THANGAMAYIL", 11)
-
 
     return (
         month_options,
@@ -1450,10 +1431,7 @@ def update_investments_content(selected_months, selected_categories, stored_data
         pie_chart,
         bar_chart,
         table_data,
-        table_columns,
-        lic_left,
-        kumaran_left,
-        thangamayil_left
+        table_columns
     )
 
 if __name__ == '__main__':
