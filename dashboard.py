@@ -1097,7 +1097,9 @@ def update_savings_monitor(selected_months, selected_categories, reset_clicks, c
     ctx = dash.callback_context
     if not stored_canara_data:
         # Return no_update for all outputs on initial load if no data exists
-        return (no_update, no_update, no_update, no_update, [], [], [], [], go.Figure(), go.Figure())
+        default_figure = go.Figure()
+        default_figure.update_layout(template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#E0E0E0"), title="No data to display")
+        return (no_update, no_update, no_update, no_update, [], [], [], [], default_figure, default_figure)
 
     df = pd.read_json(io.StringIO(stored_canara_data), orient='split')
     
@@ -1185,7 +1187,8 @@ def update_savings_monitor(selected_months, selected_categories, reset_clicks, c
      Output('lowest-category-kpi-name', 'children'),
      Output('lowest-category-kpi-value', 'children'),
      Output('investments-monthly-trend-chart', 'figure'),
-     Output('investments-category-bar-chart', 'figure'),
+     Output('investments-categories-chart', 'figure'), # This was missing in the original return
+     Output('investments-by-category-chart', 'figure'),
      Output('investments-data-table', 'data'),
      Output('investments-data-table', 'columns')],
     [Input('investments-month-filter', 'value'),
@@ -1196,14 +1199,14 @@ def update_savings_monitor(selected_months, selected_categories, reset_clicks, c
 )
 def update_investments_kpis_and_charts(selected_months, selected_categories, reset_clicks, stored_investments_data, pathname):
     if pathname != '/investments':
-        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
 
     ctx = dash.callback_context
     if not stored_investments_data:
         # Return no_update for all outputs if no data exists
         default_figure = go.Figure()
         default_figure.update_layout(template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#E0E0E0"), title="No data to display")
-        return ([], [], "₹0.00", "₹0.00", "N/A", "₹0.00", "N/A", "₹0.00", default_figure, default_figure, [], [])
+        return ([], [], "₹0.00", "₹0.00", "N/A", "₹0.00", "N/A", "₹0.00", default_figure, default_figure, default_figure, [], [])
 
     df = pd.read_json(io.StringIO(stored_investments_data), orient='split')
     df['Month'] = pd.Categorical(df['Month'], categories=['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], ordered=True)
@@ -1296,6 +1299,7 @@ def update_investments_kpis_and_charts(selected_months, selected_categories, res
         lowest_category_name,
         lowest_category_value,
         monthly_trend_chart,
+        pie_chart,
         bar_chart,
         table_data,
         table_columns
