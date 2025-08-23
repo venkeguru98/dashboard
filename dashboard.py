@@ -74,10 +74,6 @@ def load_data_from_google_sheets():
     df_investments = pd.DataFrame()
     error_message = None
 
-    if not os.path.exists(SERVICE_ACCOUNT_FILE):
-        error_message = f"❌ Error: Service account file not found at {SERVICE_ACCOUNT_FILE}. Please update the path."
-        return df_icic, df_canara, df_investments, error_message
-    
     try:
         scope = [
             "https://www.googleapis.com/auth/spreadsheets.readonly",
