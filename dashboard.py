@@ -26,8 +26,41 @@ def make_unique_column_names(column_list):
 
 # --- Google Sheets Authentication and Data Retrieval ---
 # IMPORTANT: Update this path to your service account JSON file.
-SERVICE_ACCOUNT_FILE = r"C:\Users\JEEVALAKSHMI R\Videos\dashboard_for_expense\icic-salary-data-52568c61b6e3.json"
+#SERVICE_ACCOUNT_FILE = r"C:\Users\JEEVALAKSHMI R\Videos\dashboard_for_expense\icic-salary-data-52568c61b6e3.json"
 
+# --- Google Sheets Authentication and Data Retrieval ---
+# IMPORTANT: This section has been updated to handle credentials securely
+# for deployment.
+
+# Import these libraries at the top of your file
+import json
+import tempfile
+
+# Define the scopes required for Google Sheets API access
+SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+
+try:
+    if os.environ.get("GCP_SA_CREDENTIALS"):
+        # Decode the Base64 string from the environment variable
+        credentials_json_bytes = base64.b64decode(os.environ.get("GCP_SA_CREDENTIALS"))
+        credentials_json = credentials_json_bytes.decode('utf-8')
+        creds_dict = json.loads(credentials_json)
+        creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+        print("Authenticated using Base64 environment variable.")
+    else:
+        # Fallback to local file for development
+        SERVICE_ACCOUNT_FILE = "credentials.json"
+        creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+        print("Authenticated using local file.")
+        
+    client = gspread.authorize(creds)
+    print("Authentication successful!")
+
+except Exception as e:
+    print(f"Authentication failed with error: {e}")
+    client = None
+    df_combined = pd.DataFrame()
+    
 def load_data_from_google_sheets():
     df_icic = pd.DataFrame()
     df_canara = pd.DataFrame()
@@ -1491,7 +1524,4 @@ def calculate_savings_goal(n_clicks, target_amount, duration, stored_canara_data
     return html.P("Please enter valid numbers for target amount and/or duration.", className="text-danger")
 
 if __name__ == "__main__":
-    from waitress import serve
-    print("Starting the Dashboard ... Loading ...")
-    print("Serving Dash app with Waitress...")
-    serve(app.server, host='0.0.0.0', port=8050)
+    app.run_server(debug=True)
