@@ -50,11 +50,11 @@ if "GCP_SA_CREDENTIALS" in os.environ:
 
     except (base64.binascii.Error, json.JSONDecodeError) as e:
         print(f"❌ Error decoding credentials from environment variable: {e}")
-        SERVICE_ACCOUNT_FILE = r"C:\Users\JEEVALAKSHMI R\Videos\backup\icic-salary-data-52568c61b6e3.json"
+        SERVICE_ACCOUNT_FILE = r"C:\Users\JEEVALAKSHMI R\Videos\dashboard_for_expense\icic-salary-data-52568c61b6e3.json"
         
 else:
     # Fallback to local file path for local development
-    SERVICE_ACCOUNT_FILE = r"C:\Users\JEEVALAKSHMI R\Videos\backup\icic-salary-data-52568c61b6e3.json"
+    SERVICE_ACCOUNT_FILE = r"C:\Users\JEEVALAKSHMI R\Videos\dashboard_for_expense\icic-salary-data-52568c61b6e3.json"
     print("⚠️ Warning: Environment variable 'GCP_SA_CREDENTIALS' not found. Falling back to local file path.")
 
 
