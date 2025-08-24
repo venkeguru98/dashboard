@@ -16,6 +16,10 @@
     --accent-blue: #4169E1; /* RoyalBlue */
     --accent-purple: #8A2BE2; /* BlueViolet */
     --accent-gold: #FFD700;
+    --accent-chartreuse: #7FFF00; /* Chartreuse */
+    --accent-crimson: #DC143C; /* Crimson */
+    --accent-dodgerblue: #1E90FF; /* DodgerBlue */
+    --accent-mediumspringgreen: #00FA9A; /* MediumSpringGreen */
 
     /* Gradients for "Shiny" effect */
     --gradient-header: linear-gradient(90deg, #101010 0%, #050505 100%);
@@ -30,7 +34,7 @@
     --glow-blue: 0 0 15px rgba(65, 105, 225, 0.6);
     --glow-purple: 0 0 15px rgba(138, 43, 226, 0.6);
     --glow-gold: 0 0 15px rgba(255, 215, 0, 0.6);
-
+    --glow-chartreuse: 0 0 15px rgba(127, 255, 0, 0.6);
 
     --border-subtle: 1px solid rgba(255, 255, 255, 0.1); /* Very subtle white border */
     --border-radius-base: 6px;
@@ -215,296 +219,151 @@ p, label, button, .card-title, .form-label, .nav-link-new-theme,
     border-radius: var(--border-radius-base);
     transition: all var(--transition-fast);
     font-size: 1.05rem;
-    box-shadow: var(--glow-purple); /* Purple glow */
+    box-shadow: var(--glow-blue);
+    text-shadow: 0 0 5px rgba(0,0,0,0.5);
 }
 
-.btn-reset-new-theme:hover {
-    opacity: 0.9;
-    transform: translateY(-3px);
-    box-shadow: 0 0 20px rgba(138, 43, 226, 0.8);
+.btn-reset-new-theme:hover, .btn-reset-new-theme:focus {
+    color: var(--accent-cyan);
+    box-shadow: var(--glow-cyan);
+    transform: translateY(-2px);
 }
 
-.btn-reset-new-theme:focus {
+
+/* Primary Button (e.g., Calculate Goal) */
+.btn-primary-new-theme {
+    background: var(--gradient-button) !important;
+    border: none !important;
+    color: var(--text-light);
+    font-weight: 600;
+    padding: 14px 22px;
+    border-radius: var(--border-radius-base);
+    transition: all var(--transition-fast);
+    font-size: 1.05rem;
+    box-shadow: var(--glow-magenta);
+    text-shadow: 0 0 5px rgba(0,0,0,0.5);
+}
+
+.btn-primary-new-theme:hover, .btn-primary-new-theme:focus {
+    color: var(--accent-lime);
+    box-shadow: var(--glow-lime);
+    transform: translateY(-2px);
+}
+
+/* Input Fields */
+.form-control-new-theme {
+    background-color: var(--bg-black) !important;
+    border: var(--border-subtle) !important;
+    color: var(--text-light) !important;
+    border-radius: var(--border-radius-base);
+    padding: 0.75rem 1rem;
+    transition: all var(--transition-fast);
+}
+
+.form-control-new-theme:focus {
+    border-color: var(--accent-cyan) !important;
+    box-shadow: inset 0 1px 1px rgba(0, 255, 255, 0.075), var(--glow-cyan);
     outline: none;
-    box-shadow: 0 0 0 3px rgba(138, 43, 226, 0.5) !important;
 }
 
-/* --- KPI Cards --- */
+.form-control-new-theme::placeholder {
+    color: var(--text-muted) !important;
+    opacity: 0.7;
+}
+
+/* KPI Cards */
 .kpi-card-new-theme {
     background-color: var(--bg-panel);
     border-radius: var(--border-radius-lg);
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
     padding: 2rem;
     text-align: center;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.4); /* subtle dark shadow */
-    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
     border: var(--border-subtle);
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .kpi-card-new-theme:hover {
     transform: translateY(-5px);
-    box-shadow: var(--glow-cyan); /* Interactive cyan glow on hover */
+    box-shadow: 0 5px 30px rgba(0, 0, 0, 0.6), var(--glow-cyan);
 }
 
 .kpi-label-new-theme {
-    font-size: 1.0rem;
     color: var(--text-muted);
-    margin-bottom: 0.8rem;
-    font-weight: 500;
+    font-size: 0.9rem;
+    letter-spacing: 0.5px;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    margin-bottom: 0.5rem;
 }
 
-/* KPI Values - High Contrast */
 .kpi-value-new-theme {
-    font-size: 1.8rem;
-    font-weight: 800;
-    line-height: 1.1;
-    color: var(--accent-cyan); /* Bright cyan */
-    text-shadow: var(--glow-cyan);
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+    margin: 0;
 }
 
 .kpi-value-small-new-theme {
-    font-size: 1.8rem; /* Larger for name */
+    font-size: 1.8rem;
     font-weight: 700;
-    line-height: 1.2;
-    margin-bottom: 0.3rem;
-    color: var(--accent-magenta); /* Bright magenta */
-    text-shadow: var(--glow-magenta);
+    margin: 0;
 }
 
 .kpi-sub-value-new-theme-small {
     font-size: 1.2rem;
-    font-weight: 600;
-    color: var(--accent-lime); /* Bright lime green */
-    text-shadow: var(--glow-lime);
+    color: var(--text-muted);
+    font-weight: 500;
 }
 
-/* --- Chart Panels --- */
-.chart-panel-new-theme {
+.primary-kpi { color: var(--accent-cyan); text-shadow: var(--glow-cyan); }
+.accent-kpi { color: var(--accent-magenta); text-shadow: var(--glow-magenta); }
+
+/* Chart and Table Panels */
+.chart-panel-new-theme, .table-panel-new-theme {
     background-color: var(--bg-panel);
     border-radius: var(--border-radius-lg);
-    padding: 1.8rem;
-    box-shadow: var(--glow-purple); /* Purple glow */
+    padding: 2.5rem;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
     border: var(--border-subtle);
-    overflow: hidden;
-}
-
-/* Plotly graph title and axes text */
-.modebar, .g-gtitle, .xtick, .ytick, .gtitle, .annotation-text, .infolayer .g-text, .infolayer .gtitle {
-    font-family: var(--font-body) !important;
-    fill: var(--text-light) !important;
-}
-
-/* Plotly axis and grid colors */
-.xtick, .ytick {
-    stroke: rgba(255, 255, 255, 0.15) !important; /* Lighter borders */
-}
-.xaxislayer-above .axis-line, .yaxislayer-above .axis-line {
-    stroke: rgba(255, 255, 255, 0.2) !important;
-}
-.gridlayer .xgrid, .gridlayer .ygrid {
-    stroke: rgba(255, 255, 255, 0.08) !important; /* Very subtle grid */
-}
-
-/* Ensure Plotly chart backgrounds are transparent in Python to let panel background show */
-
-
-/* --- Data Table Section --- */
-.table-panel-new-theme {
-    background-color: var(--bg-panel);
-    border-radius: var(--border-radius-lg);
-    box-shadow: var(--glow-lime); /* Lime glow for table */
-    border: var(--border-subtle);
-    padding: 2rem;
 }
 
 .section-title-new-theme {
+    font-size: 2.2rem;
     font-weight: 700;
-    font-size: 2rem;
-    color: var(--accent-gold); /* Gold accent for table title */
     letter-spacing: 1px;
-    text-shadow: var(--glow-gold);
+    text-transform: uppercase;
+    margin-bottom: 1rem;
 }
 
-/* Dash Data Table specific styles */
-.dash-spreadsheet-container .dash-spreadsheet-table {
-    border: none !important;
-}
-.dash-header-row div {
-    background-color: var(--bg-black) !important; /* Pure black header */
-    color: var(--accent-cyan) !important;
-    font-weight: 700 !important;
-    border-bottom: 2px solid var(--accent-lime) !important; /* Lime separator */
-    padding: 15px 10px !important;
-}
-.dash-cell {
-    background-color: var(--bg-panel) !important;
-    color: var(--text-light) !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
-    padding: 12px 10px !important;
-}
-.dash-cell.column-0 { /* First column (Category) special styling */
-    color: var(--accent-magenta) !important;
-    font-weight: 600;
-}
-.dash-spreadsheet-container .dash-fixed-column-header,
-.dash-spreadsheet-container .dash-fixed-column {
-    background-color: var(--bg-black) !important; /* Ensure fixed columns match header */
-    box-shadow: 2px 0 5px rgba(0,0,0,0.5); /* Subtle shadow for fixed column */
-}
-/* Style for filter input fields in the table header */
-.dash-spreadsheet-container .dash-filter input {
-    background-color: var(--bg-black) !important;
-    border: 1px solid var(--text-muted) !important;
-    border-radius: 4px;
-    color: var(--text-light) !important;
-    padding: 5px 8px;
-    font-size: 0.9em;
-    width: 90%;
-    margin: 0 auto; /* Center the input */
-    display: block; /* Ensure it takes full width within its cell */
-}
-
-/* Style for sort indicators */
-.dash-spreadsheet-container .column-header--sort,
-.dash-spreadsheet-container .column-header--sort:hover {
-    color: var(--accent-lime) !important; /* Green for sortable headers */
-}
-.dash-spreadsheet-container .column-header--sort::before {
-    color: var(--accent-lime) !important; /* Green sort arrow */
-}
-
-
-.dash-spreadsheet-container .dash-pagination-container {
-    background-color: var(--bg-black) !important;
-    border-top: var(--border-subtle);
-    padding-top: 15px;
-}
-.dash-spreadsheet-container .dash-pagination-container .dash-next-button,
-.dash-spreadsheet-container .dash-pagination-container .dash-previous-button,
-.dash-spreadsheet-container .dash-pagination-container .dash-page-input {
-    background-color: var(--bg-panel) !important;
-    color: var(--text-light) !important;
-    border: var(--border-subtle) !important;
-    border-radius: var(--border-radius-base);
-}
-.dash-spreadsheet-container .dash-pagination-container .dash-page-input:focus {
-    border-color: var(--accent-cyan) !important;
-    box-shadow: var(--glow-cyan);
-}
-
-
-/* Dash Loading Component Styling */
-.dash-loading-callback {
-    min-height: 250px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background-color: rgba(0, 0, 0, 0.6); /* Slightly more opaque overlay */
-    border-radius: var(--border-radius-base);
-}
-
-/* --- Data Loading Status Alert --- */
 .data-load-alert {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 2000;
-    width: auto;
-    max-width: 450px;
-    padding: 15px 25px;
-    border-radius: var(--border-radius-base);
-    box-shadow: var(--glow-lime); /* Lime glow for alert */
-    opacity: 0;
-    transition: opacity 0.5s ease-in-out;
-}
-
-/* Adjusted alert colors to fit new theme */
-.data-load-alert.alert-success { background-color: rgba(0, 255, 0, 0.15); border-left: 5px solid var(--accent-lime); color: var(--accent-lime); }
-.data-load-alert.alert-danger { background-color: rgba(255, 0, 0, 0.15); border-left: 5px solid #FF0000; color: #FF6060; }
-.data-load-alert.alert-warning { background-color: rgba(255, 215, 0, 0.15); border-left: 5px solid var(--accent-gold); color: var(--accent-gold); }
-.data-load-alert.alert-info { background-color: rgba(0, 255, 255, 0.15); border-left: 5px solid var(--accent-cyan); color: var(--accent-cyan); }
-
-
-.data-load-alert.fade-in {
-    opacity: 1;
-}
-
-.data-load-alert.fade-out {
-    animation: fadeOut 3s forwards;
-}
-
-@keyframes fadeOut {
-    0% { opacity: 1; }
-    80% { opacity: 1; }
-    100% { opacity: 0; display: none; }
+    margin-top: 1rem;
+    position: sticky;
+    top: 90px;
+    z-index: 999;
 }
 
 
-/* --- Custom Scrollbar (for Webkit browsers) --- */
-::-webkit-scrollbar {
-    width: 12px;
-    height: 12px;
-}
-
-::-webkit-scrollbar-track {
-    background: var(--bg-panel);
-    border-radius: 6px;
-}
-
-::-webkit-scrollbar-thumb {
-    background: var(--accent-purple); /* Purple thumb */
-    border-radius: 6px;
-    border: 2px solid var(--bg-black);
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: var(--accent-magenta); /* Magenta on hover */
-    box-shadow: 0 0 5px var(--accent-magenta);
-}
-
-/* New: Gold/Silver Price Page Specifics */
-.gold-silver-kpi-container {
-    display: flex;
-    justify-content: center;
-    gap: 20px; /* Space between the KPI cards */
-    flex-wrap: wrap; /* Allow cards to wrap on smaller screens */
-}
-
-/* Specific styling for gold/silver cards if needed */
-.gold-card .kpi-value-new-theme {
-    color: var(--accent-gold); /* Gold color for Gold price */
-    text-shadow: var(--glow-gold);
-}
-.silver-card .kpi-value-new-theme {
-    color: var(--text-light); /* Lighter color for Silver price */
-    text-shadow: var(--glow-cyan);
-}
-
-/* Colors for positive/negative changes */
-.text-success { color: var(--accent-lime) !important; } /* Neon Green for positive change */
-.text-danger { color: var(--accent-magenta) !important; } /* Magenta for negative change */
-
-
-/* --- Responsive Adjustments --- */
-@media (max-width: 992px) {
+/* Media Queries for Responsiveness */
+@media (max-width: 991.98px) {
     .top-navbar-new-theme {
         flex-direction: column;
-        padding: 1rem 1.5rem;
+        align-items: flex-start;
+        padding: 1.5rem;
     }
-    .header-title-new-theme {
-        font-size: 1.8rem;
-        margin-bottom: 1rem;
-    }
+
     .header-nav-new-theme {
+        flex-direction: column !important;
+        align-items: stretch !important;
         width: 100%;
-        justify-content: center;
+        margin-top: 1rem;
     }
+
     .header-nav-new-theme .nav-link-new-theme {
-        margin: 0.2rem 0.5rem;
-        padding: 0.6rem 1rem;
-        font-size: 0.9rem;
+        margin-left: 0 !important;
+        margin-bottom: 0.5rem;
+        justify-content: center;
+        text-align: center;
     }
+
     .header-nav-new-theme .nav-link-new-theme .bi {
         margin-right: 0.5rem !important;
     }
@@ -526,21 +385,8 @@ p, label, button, .card-title, .form-label, .nav-link-new-theme,
     .header-title-new-theme {
         font-size: 1.5rem;
     }
-    .header-nav-new-theme {
-        flex-wrap: wrap;
-    }
     .header-nav-new-theme .nav-link-new-theme {
-        flex-basis: calc(50% - 1rem); /* Two items per row */
-        margin: 0.2rem 0.5rem;
-        justify-content: center;
-    }
-    .main-content-new-theme { padding: 1rem !important; }
-    .kpi-value-new-theme { font-size: 1.5rem; }
-    .kpi-value-small-new-theme { font-size: 1.3rem; }
-    .kpi-sub-value-new-theme-small { font-size: 0.9rem; }
-
-    /* For Gold/Silver cards on very small screens */
-    .gold-silver-kpi-container .kpi-card-new-theme {
-        width: 90%; /* Take more width on small screens */
+        padding: 0.5rem 1rem;
+        font-size: 0.9rem;
     }
 }
