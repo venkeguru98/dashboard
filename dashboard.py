@@ -9,7 +9,6 @@ import dash_bootstrap_components as dbc
 import os
 import time
 import json
-import tempfile
 import base64
 
 # --- Helper function to ensure unique column names ---
@@ -29,47 +28,52 @@ def make_unique_column_names(column_list):
 
 # --- Google Sheets Authentication and Data Retrieval ---
 # IMPORTANT: This section has been updated to handle credentials securely
-# for deployment.
-
-# Check for credentials in an environment variable for deployment
-if "GCP_SA_CREDENTIALS" in os.environ:
-    credentials_content_base64 = os.environ.get("GCP_SA_CREDENTIALS")
-    try:
-        # Decode the Base64 string
-        credentials_content = base64.b64decode(credentials_content_base64).decode('utf-8')
-        # Create a temporary file to hold the credentials
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as temp_file:
-            temp_file.write(credentials_content)
-            SERVICE_ACCOUNT_FILE = temp_file.name
-        print("Authenticated using Base64 environment variable.")
-    except (json.JSONDecodeError, ValueError) as e:
-        print(f"Error parsing JSON from environment variable: {e}")
-        SERVICE_ACCOUNT_FILE = None
-        raise Exception("Failed to load service account credentials from environment variable.")
-else:
-    # Fallback to local file path for local development
-    SERVICE_ACCOUNT_FILE = r"C:\Users\JEEVALAKSHMI R\Videos\dashboard_for_expense\icic-salary-data-52568c61b6e3.json"
-    print("Using local service account file path. Set GCP_SA_CREDENTIALS for deployment.")
-    
+# for deployment on services like Render.
 def load_data_from_google_sheets():
     df_icic = pd.DataFrame()
     df_canara = pd.DataFrame()
     df_investments = pd.DataFrame()
     error_message = None
     
-    # This check is for local development only. Render will handle the environment variable.
-    if not os.path.exists(SERVICE_ACCOUNT_FILE) and "GCP_SA_CREDENTIALS" not in os.environ:
-        error_message = f"❌ Error: Service account file not found at {SERVICE_ACCOUNT_FILE}. Please update the path."
-        return df_icic, df_canara, df_investments, error_message
-    
+    creds_info = None
+
+    # Check for credentials in an environment variable for production
+    if "GCP_SA_CREDENTIALS_BASE64" in os.environ:
+        credentials_content_base64 = os.environ.get("GCP_SA_CREDENTIALS_BASE64")
+        try:
+            # Decode the Base64 string and load as JSON
+            credentials_json = base64.b64decode(credentials_content_base64).decode('utf-8')
+            creds_info = json.loads(credentials_json)
+            print("Using credentials from environment variable.")
+        except Exception as e:
+            error_message = f"❌ Error decoding credentials from environment variable: {e}"
+            print(error_message)
+            return df_icic, df_canara, df_investments, error_message
+    else:
+        # Fallback to local file for local development
+        local_service_account_file = "icic-salary-data-52568c61b6e3.json"
+        if os.path.exists(local_service_account_file):
+            print("Using local service account file. This is for local development only.")
+            creds_info = local_service_account_file
+        else:
+            error_message = f"❌ Error: 'GCP_SA_CREDENTIALS_BASE64' environment variable not found and local file '{local_service_account_file}' is missing. Please set up your credentials."
+            print(error_message)
+            return df_icic, df_canara, df_investments, error_message
+
     try:
         scope = [
             "https://www.googleapis.com/auth/spreadsheets.readonly",
             "https://www.googleapis.com/auth/drive.readonly",
         ]
-        creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scope)
+        
+        if isinstance(creds_info, dict):
+            # Authenticate using the dictionary (from environment variable)
+            creds = Credentials.from_service_account_info(creds_info, scopes=scope)
+        else:
+            # Authenticate using the file path (from local development)
+            creds = Credentials.from_service_account_file(creds_info, scopes=scope)
+
         client = gspread.authorize(creds)
-        print("Authentication successful!")
 
         sheet_url = "https://docs.google.com/spreadsheets/d/1o1e8ouOghU_1L592pt_OSxn6aUSY5KNm1HOT6zbbQOA/edit?gid=1788780645#gid=1788780645"
         spreadsheet = client.open_by_url(sheet_url)
@@ -290,7 +294,7 @@ app.layout = dbc.Container(
     [
         dcc.Store(id='stored-icic-data'),
         dcc.Store(id='stored-canara-data'),
-        dcc.Store(id='stored-investments-data'),
+        dcc.Store(id='stored-investments-data'),  # New store for investments data
         dcc.Store(id='loading-error-message'),
         dcc.Interval(
             id='interval-component',
@@ -312,7 +316,7 @@ app.layout = dbc.Container(
                                 dbc.NavLink([html.I(className="bi bi-piggy-bank me-2"), "Savings Monitor"], href="/savings", className="nav-link-new-theme"),
                                 dbc.NavLink([html.I(className="bi bi-graph-up me-2"), "Analytics & Trends"], href="/analytics", className="nav-link-new-theme"),
                                 dbc.NavLink([html.I(className="bi bi-table me-2"), "Raw Data Table"], href="/data-table", className="nav-link-new-theme"),
-                                dbc.NavLink([html.I(className="bi bi-currency-exchange me-2"), "Investments"], href="/investments", className="nav-link-new-theme"),
+                                dbc.NavLink([html.I(className="bi bi-currency-exchange me-2"), "Investments"], href="/investments", className="nav-link-new-theme"),  # New Investments tab
                                 dbc.NavLink([html.I(className="bi bi-gear me-2"), "Configuration"], href="/settings", className="nav-link-new-theme"),
                             ],
                             className="header-nav-new-theme",
@@ -513,26 +517,28 @@ savings_monitor_layout = dbc.Col(
                 width=12
             )
         ),
+
         dbc.Row([
             dbc.Col(dbc.Card(
                 dbc.CardBody([
                     html.P("Total Savings (Credit)", className="kpi-label-new-theme"),
-                    html.H4("₹0.00", id="total-savings-credit-kpi", className="kpi-value-new-theme primary-kpi", style={'color': 'var(--accent-lime)', 'textShadow': 'var(--glow-lime)'}),
+                    html.H4("₹0.00", id="total-savings-credit-kpi", className="kpi-value-new-theme primary-kpi", style={'color': 'var(--accent-lime)', 'textShadow': 'var(--glow-lime)'}), 
                 ]), className="kpi-card-new-theme"
             ), lg=4, md=6, sm=12, className="mb-4"),
             dbc.Col(dbc.Card(
                 dbc.CardBody([
                     html.P("Total Withdrawals (Debit)", className="kpi-label-new-theme"),
-                    html.H4("₹0.00", id="total-savings-debit-kpi", className="kpi-value-new-theme accent-kpi", style={'color': 'var(--accent-magenta)', 'textShadow': 'var(--glow-magenta)'}),
+                    html.H4("₹0.00", id="total-savings-debit-kpi", className="kpi-value-new-theme accent-kpi", style={'color': 'var(--accent-magenta)', 'textShadow': 'var(--glow-magenta)'}), 
                 ]), className="kpi-card-new-theme"
             ), lg=4, md=6, sm=12, className="mb-4"),
             dbc.Col(dbc.Card(
                 dbc.CardBody([
                     html.P("Net Savings", className="kpi-label-new-theme"),
-                    html.H4("₹0.00", id="net-savings-kpi", className="kpi-value-new-theme text-info", style={'color': 'var(--accent-cyan)', 'textShadow': 'var(--glow-cyan)'}),
+                    html.H4("₹0.00", id="net-savings-kpi", className="kpi-value-new-theme text-info", style={'color': 'var(--accent-cyan)', 'textShadow': 'var(--glow-cyan)'}), 
                 ]), className="kpi-card-new-theme"
             ), lg=4, md=12, sm=12, className="mb-4"),
         ], className="g-4 mb-5"),
+
         # Savings Goal Calculator Section
         dbc.Row([
             dbc.Col(
@@ -582,29 +588,32 @@ savings_monitor_layout = dbc.Col(
                 width=12
             )
         ]),
+
         dbc.Row([
             dbc.Col(dcc.Loading(id="loading-savings-trend", type="circle", color=CUSTOM_COLOR_PALETTE[0], children=dcc.Graph(id="savings-monthly-trend-chart")), width=12, className="mb-4 chart-panel-new-theme"),
         ], className="g-4"),
+
         dbc.Row([
             dbc.Col(dcc.Loading(id="loading-savings-category", type="circle", color=CUSTOM_COLOR_PALETTE[1], children=dcc.Graph(id="savings-category-bar-chart")), width=12, className="mb-4 chart-panel-new-theme"),
         ], className="g-4"),
+
         dbc.Row([
             dbc.Col(
                 html.Div([
-                    html.H4("📈 Detailed Savings Data", className="section-title-new-theme text-center mb-4"),
+                    html.H4("📊 Detailed Savings Transactions", className="section-title-new-theme text-center mb-4", style={'color': 'var(--accent-gold)', 'textShadow': 'var(--glow-gold)'}),
                     dcc.Loading(
-                        id="loading-savings-table", type="circle", color=CUSTOM_COLOR_PALETTE[2],
+                        id="loading-savings-table", type="circle", color=CUSTOM_COLOR_PALETTE[3],
                         children=dash_table.DataTable(
                             id="savings-data-table",
                             data=[],
                             columns=[],
                             style_table={"overflowX": "auto"},
                             style_cell={"textAlign": "center", "padding": "12px", "fontFamily": "Open Sans, sans-serif", "fontSize": "0.9em"},
-                            style_header={"backgroundColor": "#000000", "color": "#FF00FF", "fontWeight": "bold", "borderBottom": "2px solid #39FF14"},
+                            style_header={"backgroundColor": "#000000", "color": "#00FFFF", "fontWeight": "bold", "borderBottom": "2px solid #00FF00"},
                             style_data={"backgroundColor": "#1A1A1A", "color": "#E0E0E0", "borderBottom": "1px solid rgba(255, 255, 255, 0.05)"},
                             style_data_conditional=[
                                 {"if": {"row_index": "odd"}, "backgroundColor": "#121212"},
-                                {"if": {"row_index": "even"}, "backgroundColor": "#1A1A1A"},
+                                {"if": {"row_index": "even"}, "backgroundColor": "#1A1A1A"}, 
                             ],
                             page_action="native",
                             page_size=10,
@@ -619,183 +628,12 @@ savings_monitor_layout = dbc.Col(
     className="main-content-new-theme"
 )
 
-# --- Layout for the Analytics & Trends Page ---
-analytics_page_layout = dbc.Col(
-    [
-        dbc.Row(
-            dbc.Col(
-                html.H2("📈 Analytics & Trends", className="section-title-new-theme text-center mb-4", style={'color': 'var(--accent-blue)', 'textShadow': 'var(--glow-blue)'}),
-                width=12
-            )
-        ),
-        dbc.Row(
-            dbc.Col(
-                dbc.Card(
-                    dbc.CardBody([
-                        html.H5("Select Data for Trend Analysis", className="card-title-new-theme text-center mb-3"),
-                        dbc.Row([
-                            dbc.Col(
-                                html.Div([
-                                    html.Label("Chart Type:", className="form-label-new-theme"),
-                                    dcc.Dropdown(
-                                        id="chart-type-dropdown",
-                                        options=[
-                                            {'label': 'Line Chart (Time Series)', 'value': 'line'},
-                                            {'label': 'Area Chart', 'value': 'area'},
-                                            {'label': 'Bar Chart (Comparison)', 'value': 'bar'}
-                                        ],
-                                        value='line',
-                                        clearable=False,
-                                        className="dropdown-new-theme"
-                                    ),
-                                ]),
-                                lg=4, md=6, sm=12, className="mb-3"
-                            ),
-                            dbc.Col(
-                                html.Div([
-                                    html.Label("Select Month(s):", className="form-label-new-theme"),
-                                    dcc.Dropdown(
-                                        id="analytics-month-filter",
-                                        options=[],
-                                        multi=True,
-                                        placeholder="All Months",
-                                        className="dropdown-new-theme"
-                                    ),
-                                ]),
-                                lg=4, md=6, sm=12, className="mb-3"
-                            ),
-                            dbc.Col(
-                                html.Div([
-                                    html.Label("Select Category(s):", className="form-label-new-theme"),
-                                    dcc.Dropdown(
-                                        id="analytics-category-filter",
-                                        options=[],
-                                        multi=True,
-                                        placeholder="All Categories",
-                                        className="dropdown-new-theme"
-                                    ),
-                                ]),
-                                lg=4, md=12, sm=12, className="mb-3"
-                            ),
-                        ], className="g-3 justify-content-center")
-                    ]),
-                    className="filter-card-new-theme mb-5"
-                ),
-                width=12
-            )
-        ),
-        dbc.Row([
-            dbc.Col(dcc.Loading(id="loading-analytics-chart", type="circle", color=CUSTOM_COLOR_PALETTE[3], children=dcc.Graph(id="analytics-chart")), width=12, className="mb-4 chart-panel-new-theme"),
-        ], className="g-4")
-    ],
-    width=12,
-    className="main-content-new-theme"
-)
-
-# --- Layout for the Raw Data Table Page ---
-data_table_layout = dbc.Col(
-    [
-        dbc.Row(
-            dbc.Col(
-                html.H2("📝 Raw Data Tables", className="section-title-new-theme text-center mb-4", style={'color': 'var(--accent-purple)', 'textShadow': 'var(--glow-purple)'}),
-                width=12
-            )
-        ),
-        dbc.Row([
-            dbc.Col(
-                html.Div([
-                    html.H4("ICIC Salary Data", className="section-title-new-theme text-center mb-4"),
-                    dcc.Loading(
-                        id="loading-raw-icic", type="circle", color=CUSTOM_COLOR_PALETTE[0],
-                        children=dash_table.DataTable(
-                            id="raw-icic-table",
-                            data=[],
-                            columns=[],
-                            style_table={"overflowX": "auto"},
-                            style_cell={"textAlign": "left", "padding": "12px", "fontFamily": "Open Sans, sans-serif", "fontSize": "0.9em"},
-                            style_header={"backgroundColor": "#000000", "color": "#00FFFF", "fontWeight": "bold", "borderBottom": "2px solid #00FF00"},
-                            style_data={"backgroundColor": "#1A1A1A", "color": "#E0E0E0", "borderBottom": "1px solid rgba(255, 255, 255, 0.05)"},
-                            style_data_conditional=[
-                                {"if": {"row_index": "odd"}, "backgroundColor": "#121212"},
-                                {"if": {"row_index": "even"}, "backgroundColor": "#1A1A1A"}, 
-                            ],
-                            page_action="native",
-                            page_size=10,
-                            sort_action="native",
-                            filter_action="native",
-                        )
-                    )
-                ], className="table-panel-new-theme p-4 mb-5"),
-                width=12
-            )
-        ], className="g-4"),
-        dbc.Row([
-            dbc.Col(
-                html.Div([
-                    html.H4("CANARA Savings Data", className="section-title-new-theme text-center mb-4"),
-                    dcc.Loading(
-                        id="loading-raw-canara", type="circle", color=CUSTOM_COLOR_PALETTE[1],
-                        children=dash_table.DataTable(
-                            id="raw-canara-table",
-                            data=[],
-                            columns=[],
-                            style_table={"overflowX": "auto"},
-                            style_cell={"textAlign": "left", "padding": "12px", "fontFamily": "Open Sans, sans-serif", "fontSize": "0.9em"},
-                            style_header={"backgroundColor": "#000000", "color": "#FF00FF", "fontWeight": "bold", "borderBottom": "2px solid #39FF14"},
-                            style_data={"backgroundColor": "#1A1A1A", "color": "#E0E0E0", "borderBottom": "1px solid rgba(255, 255, 255, 0.05)"},
-                            style_data_conditional=[
-                                {"if": {"row_index": "odd"}, "backgroundColor": "#121212"},
-                                {"if": {"row_index": "even"}, "backgroundColor": "#1A1A1A"}, 
-                            ],
-                            page_action="native",
-                            page_size=10,
-                            sort_action="native",
-                            filter_action="native",
-                        )
-                    )
-                ], className="table-panel-new-theme p-4 mb-5"),
-                width=12
-            )
-        ], className="g-4"),
-        dbc.Row([
-            dbc.Col(
-                html.Div([
-                    html.H4("Investments Data", className="section-title-new-theme text-center mb-4"),
-                    dcc.Loading(
-                        id="loading-raw-investments", type="circle", color=CUSTOM_COLOR_PALETTE[2],
-                        children=dash_table.DataTable(
-                            id="raw-investments-table",
-                            data=[],
-                            columns=[],
-                            style_table={"overflowX": "auto"},
-                            style_cell={"textAlign": "left", "padding": "12px", "fontFamily": "Open Sans, sans-serif", "fontSize": "0.9em"},
-                            style_header={"backgroundColor": "#000000", "color": "#39FF14", "fontWeight": "bold", "borderBottom": "2px solid #8A2BE2"},
-                            style_data={"backgroundColor": "#1A1A1A", "color": "#E0E0E0", "borderBottom": "1px solid rgba(255, 255, 255, 0.05)"},
-                            style_data_conditional=[
-                                {"if": {"row_index": "odd"}, "backgroundColor": "#121212"},
-                                {"if": {"row_index": "even"}, "backgroundColor": "#1A1A1A"}, 
-                            ],
-                            page_action="native",
-                            page_size=10,
-                            sort_action="native",
-                            filter_action="native",
-                        )
-                    )
-                ], className="table-panel-new-theme p-4 mb-5"),
-                width=12
-            )
-        ], className="g-4")
-    ],
-    width=12,
-    className="main-content-new-theme"
-)
-
 # --- Layout for the Investments Page ---
-investments_page_layout = dbc.Col(
+investments_layout = dbc.Col(
     [
         dbc.Row(
             dbc.Col(
-                html.H2("📈 Investments", className="section-title-new-theme text-center mb-4", style={'color': 'var(--accent-cyan)', 'textShadow': 'var(--glow-cyan)'}),
+                html.H2("💰 Investments", className="section-title-new-theme text-center mb-4", style={'color': 'var(--accent-gold)', 'textShadow': 'var(--glow-gold)'}),
                 width=12
             )
         ),
@@ -852,35 +690,65 @@ investments_page_layout = dbc.Col(
             dbc.Col(dbc.Card(
                 dbc.CardBody([
                     html.P("Total Investments", className="kpi-label-new-theme"),
-                    html.H4("₹0.00", id="total-investments-kpi", className="kpi-value-new-theme primary-kpi", style={'color': 'var(--accent-lime)', 'textShadow': 'var(--glow-lime)'}),
+                    html.H4("₹0.00", id="total-investments-kpi", className="kpi-value-new-theme primary-kpi", style={'color': 'var(--accent-gold)', 'textShadow': 'var(--glow-gold)'}),
                 ]), className="kpi-card-new-theme"
-            ), lg=4, md=6, sm=12, className="mb-4"),
+            ), lg=3, md=6, sm=12, className="mb-4"),
             dbc.Col(dbc.Card(
                 dbc.CardBody([
                     html.P("Avg Monthly Investment", className="kpi-label-new-theme"),
-                    html.H4("₹0.00", id="avg-monthly-investment-kpi", className="kpi-value-new-theme accent-kpi", style={'color': 'var(--accent-magenta)', 'textShadow': 'var(--glow-magenta)'}),
+                    html.H4("₹0.00", id="avg-monthly-investment-kpi", className="kpi-value-new-theme accent-kpi", style={'color': 'var(--accent-cyan)', 'textShadow': 'var(--glow-cyan)'}),
+                ]), className="kpi-card-new-theme"
+            ), lg=3, md=6, sm=12, className="mb-4"),
+            dbc.Col(dbc.Card(
+                dbc.CardBody([
+                    html.P("Highest Investment Category", className="kpi-label-new-theme"),
+                    html.H5("N/A", id="highest-category-kpi-name", className="kpi-value-small-new-theme text-warning"),
+                    html.P("₹0.00", id="highest-category-kpi-value", className="kpi-sub-value-new-theme-small"),
+                ]), className="kpi-card-new-theme"
+            ), lg=3, md=6, sm=12, className="mb-4"),
+            dbc.Col(dbc.Card(
+                dbc.CardBody([
+                    html.P("Lowest Investment Category", className="kpi-label-new-theme"),
+                    html.H5("N/A", id="lowest-category-kpi-name", className="kpi-value-small-new-theme text-info"),
+                    html.P("₹0.00", id="lowest-category-kpi-value", className="kpi-sub-value-new-theme-small"),
+                ]), className="kpi-card-new-theme"
+            ), lg=3, md=6, sm=12, className="mb-4"),
+        ], className="g-4 mb-5"),
+        # New KPI Row for remaining installments
+        dbc.Row([
+            dbc.Col(dbc.Card(
+                dbc.CardBody([
+                    html.P("LIC Installments Left", className="kpi-label-new-theme"),
+                    html.H4("N/A", id="lic-installments-kpi", className="kpi-value-new-theme text-info"),
                 ]), className="kpi-card-new-theme"
             ), lg=4, md=6, sm=12, className="mb-4"),
             dbc.Col(dbc.Card(
                 dbc.CardBody([
-                    html.P("Highest Category", className="kpi-label-new-theme"),
-                    html.H5("N/A", id="highest-investments-kpi-name", className="kpi-value-small-new-theme text-warning", style={'color': 'var(--accent-gold)', 'textShadow': 'var(--glow-gold)'}),
-                    html.P("₹0.00", id="highest-investments-kpi-value", className="kpi-sub-value-new-theme-small"),
+                    html.P("Kumaran Installments Left", className="kpi-label-new-theme"),
+                    html.H4("N/A", id="kumaran-installments-kpi", className="kpi-value-new-theme text-info"),
                 ]), className="kpi-card-new-theme"
-            ), lg=4, md=12, sm=12, className="mb-4"),
+            ), lg=4, md=6, sm=12, className="mb-4"),
+            dbc.Col(dbc.Card(
+                dbc.CardBody([
+                    html.P("Thangamayil Installments Left", className="kpi-label-new-theme"),
+                    html.H4("N/A", id="thangamayil-installments-kpi", className="kpi-value-new-theme text-info"),
+                ]), className="kpi-card-new-theme"
+            ), lg=4, md=6, sm=12, className="mb-4"),
         ], className="g-4 mb-5"),
-        # Charts for Investments
+        # Charts Section for Investments
         dbc.Row([
-            dbc.Col(dcc.Loading(id="loading-investments-pie-chart", type="circle", color=CUSTOM_COLOR_PALETTE[0], children=dcc.Graph(id="investments-pie-chart")), lg=6, md=12, className="mb-4 chart-panel-new-theme"),
-            dbc.Col(dcc.Loading(id="loading-investments-bar-chart", type="circle", color=CUSTOM_COLOR_PALETTE[1], children=dcc.Graph(id="investments-bar-chart")), lg=6, md=12, className="mb-4 chart-panel-new-theme"),
+            dbc.Col(dcc.Loading(id="loading-investments-trend", type="circle", color=CUSTOM_COLOR_PALETTE[0], children=dcc.Graph(id="investments-monthly-trend-chart")), lg=6, md=12, className="mb-4 chart-panel-new-theme"),
+            dbc.Col(dcc.Loading(id="loading-investments-pie", type="circle", color=CUSTOM_COLOR_PALETTE[1], children=dcc.Graph(id="investments-category-pie-chart")), lg=6, md=12, className="mb-4 chart-panel-new-theme"),
         ], className="g-4"),
-        # Data Table Section for Investments
+        dbc.Row([
+            dbc.Col(dcc.Loading(id="loading-investments-bar", type="circle", color=CUSTOM_COLOR_PALETTE[2], children=dcc.Graph(id="investments-monthly-by-category-chart")), width=12, className="mb-4 chart-panel-new-theme"),
+        ], className="g-4"),
         dbc.Row([
             dbc.Col(
                 html.Div([
-                    html.H4("📊 Detailed Investments Data", className="section-title-new-theme text-center mb-4"),
+                    html.H4("📊 Detailed Investments Data", className="section-title-new-theme text-center mb-4", style={'color': 'var(--accent-gold)', 'textShadow': 'var(--glow-gold)'}),
                     dcc.Loading(
-                        id="loading-investments-table", type="circle", color=CUSTOM_COLOR_PALETTE[2],
+                        id="loading-investments-table", type="circle", color=CUSTOM_COLOR_PALETTE[3],
                         children=dash_table.DataTable(
                             id="investments-data-table",
                             data=[],
@@ -906,12 +774,12 @@ investments_page_layout = dbc.Col(
     className="main-content-new-theme"
 )
 
-# --- Layout for the Settings Page ---
-settings_page_layout = dbc.Col(
+# --- Layout for the Analytics & Trends Page ---
+analytics_trends_layout = dbc.Col(
     [
         dbc.Row(
             dbc.Col(
-                html.H2("⚙️ Configuration & Settings", className="section-title-new-theme text-center mb-4", style={'color': 'var(--accent-gold)', 'textShadow': 'var(--glow-gold)'}),
+                html.H2("📈 Analytics & Trends", className="section-title-new-theme text-center mb-4", style={'color': 'var(--accent-blue)', 'textShadow': 'var(--glow-blue)'}),
                 width=12
             )
         ),
@@ -919,629 +787,537 @@ settings_page_layout = dbc.Col(
             dbc.Col(
                 dbc.Card(
                     dbc.CardBody([
-                        html.H5("Manage Data and Credentials", className="card-title-new-theme text-center mb-3"),
+                        html.H5("Advanced Analysis Filters", className="card-title-new-theme text-center mb-3"),
                         dbc.Row([
                             dbc.Col(
                                 html.Div([
-                                    html.Label("Spreadsheet URL:", className="form-label-new-theme"),
-                                    dcc.Input(
-                                        id="spreadsheet-url-input",
-                                        type="url",
-                                        placeholder="Enter Google Sheet URL...",
-                                        className="form-control-new-theme w-100",
-                                        value="https://docs.google.com/spreadsheets/d/1o1e8ouOghU_1L592pt_OSxn6aUSY5KNm1HOT6zbbQOA/edit#gid=1788780645"
+                                    html.Label("Compare Categories:", className="form-label-new-theme"),
+                                    dcc.Dropdown(
+                                        id="trend-category-filter",
+                                        options=[],
+                                        multi=True,
+                                        placeholder="Select Categories",
+                                        className="dropdown-new-theme"
                                     ),
                                 ]),
-                                lg=8, md=12, sm=12, className="mb-3"
+                                lg=6, md=12, sm=12, className="mb-3"
                             ),
                             dbc.Col(
-                                html.Button(
-                                    [html.I(className="bi bi-arrow-clockwise me-2"), "Force Reload Data"],
-                                    id="reload-data-button", n_clicks=0,
-                                    className="btn-primary-new-theme w-100 mt-4"
-                                ),
-                                lg=4, md=12, sm=12, className="mb-3 d-flex align-items-end"
+                                html.Div([
+                                    html.Label("Select Month Range:", className="form-label-new-theme"),
+                                    dcc.RangeSlider(
+                                        id="month-range-slider",
+                                        min=0,
+                                        max=1,
+                                        step=1,
+                                        marks={0: 'Start', 1: 'End'},
+                                        value=[0, 1],
+                                        tooltip={"placement": "bottom", "always_visible": True},
+                                        className="rangeslider-new-theme"
+                                    ),
+                                ]),
+                                lg=6, md=12, sm=12, className="mb-3 d-flex align-items-end"
                             ),
-                        ], className="g-3 justify-content-center"),
-                        html.Div(id="reload-status-message", className="text-center mt-3 kpi-sub-value-new-theme-small")
+                        ], className="g-3 justify-content-center")
                     ]),
                     className="filter-card-new-theme mb-5"
                 ),
                 width=12
             )
+        ),
+        dbc.Row([
+            dbc.Col(dcc.Loading(id="loading-line-chart", type="circle", color=CUSTOM_COLOR_PALETTE[0], children=dcc.Graph(id="category-trends-chart")), width=12, className="mb-4 chart-panel-new-theme"),
+        ], className="g-4"),
+        dbc.Row([
+            dbc.Col(dcc.Loading(id="loading-scatter-chart", type="circle", color=CUSTOM_COLOR_PALETTE[1], children=dcc.Graph(id="monthly-correlation-chart")), lg=6, md=12, className="mb-4 chart-panel-new-theme"),
+            dbc.Col(dcc.Loading(id="loading-heatmap", type="circle", color=CUSTOM_COLOR_PALETTE[2], children=dcc.Graph(id="category-heatmap-chart")), lg=6, md=12, className="mb-4 chart-panel-new-theme"),
+        ], className="g-4")
+    ],
+    width=12,
+    className="main-content-new-theme"
+)
+
+# --- Layout for the Raw Data Table Page ---
+raw_data_table_layout = dbc.Col(
+    [
+        dbc.Row(
+            dbc.Col(
+                html.H2("📖 Raw Data", className="section-title-new-theme text-center mb-4", style={'color': 'var(--accent-purple)', 'textShadow': 'var(--glow-purple)'}),
+                width=12
+            )
+        ),
+        dbc.Tabs(
+            [
+                dbc.Tab(
+                    dcc.Loading(
+                        id="loading-raw-icic", type="circle", color=CUSTOM_COLOR_PALETTE[3],
+                        children=dash_table.DataTable(
+                            id='icic-raw-data-table',
+                            data=[],
+                            columns=[],
+                            style_table={"overflowX": "auto"},
+                            style_cell={"textAlign": "center", "padding": "12px", "fontFamily": "Open Sans, sans-serif", "fontSize": "0.9em"},
+                            style_header={"backgroundColor": "#000000", "color": "#00FFFF", "fontWeight": "bold", "borderBottom": "2px solid #00FF00"},
+                            style_data={"backgroundColor": "#1A1A1A", "color": "#E0E0E0", "borderBottom": "1px solid rgba(255, 255, 255, 0.05)"},
+                            style_data_conditional=[
+                                {"if": {"row_index": "odd"}, "backgroundColor": "#121212"},
+                                {"if": {"row_index": "even"}, "backgroundColor": "#1A1A1A"},
+                            ],
+                            page_action="native",
+                            page_size=10,
+                        )
+                    ),
+                    label="ICIC Salary Data",
+                    tab_style={"backgroundColor": "#121212", "borderColor": "#0A0A0A"},
+                    label_style={"color": CUSTOM_COLOR_PALETTE[0]}
+                ),
+                dbc.Tab(
+                    dcc.Loading(
+                        id="loading-raw-canara", type="circle", color=CUSTOM_COLOR_PALETTE[3],
+                        children=dash_table.DataTable(
+                            id='canara-raw-data-table',
+                            data=[],
+                            columns=[],
+                            style_table={"overflowX": "auto"},
+                            style_cell={"textAlign": "center", "padding": "12px", "fontFamily": "Open Sans, sans-serif", "fontSize": "0.9em"},
+                            style_header={"backgroundColor": "#000000", "color": "#00FFFF", "fontWeight": "bold", "borderBottom": "2px solid #00FF00"},
+                            style_data={"backgroundColor": "#1A1A1A", "color": "#E0E0E0", "borderBottom": "1px solid rgba(255, 255, 255, 0.05)"},
+                            style_data_conditional=[
+                                {"if": {"row_index": "odd"}, "backgroundColor": "#121212"},
+                                {"if": {"row_index": "even"}, "backgroundColor": "#1A1A1A"},
+                            ],
+                            page_action="native",
+                            page_size=10,
+                        )
+                    ),
+                    label="CANARA Bank Data",
+                    tab_style={"backgroundColor": "#121212", "borderColor": "#0A0A0A"},
+                    label_style={"color": CUSTOM_COLOR_PALETTE[1]}
+                ),
+                dbc.Tab(
+                    dcc.Loading(
+                        id="loading-raw-investments", type="circle", color=CUSTOM_COLOR_PALETTE[3],
+                        children=dash_table.DataTable(
+                            id='investments-raw-data-table',
+                            data=[],
+                            columns=[],
+                            style_table={"overflowX": "auto"},
+                            style_cell={"textAlign": "center", "padding": "12px", "fontFamily": "Open Sans, sans-serif", "fontSize": "0.9em"},
+                            style_header={"backgroundColor": "#000000", "color": "#00FFFF", "fontWeight": "bold", "borderBottom": "2px solid #00FF00"},
+                            style_data={"backgroundColor": "#1A1A1A", "color": "#E0E0E0", "borderBottom": "1px solid rgba(255, 255, 255, 0.05)"},
+                            style_data_conditional=[
+                                {"if": {"row_index": "odd"}, "backgroundColor": "#121212"},
+                                {"if": {"row_index": "even"}, "backgroundColor": "#1A1A1A"},
+                            ],
+                            page_action="native",
+                            page_size=10,
+                        )
+                    ),
+                    label="Investments Data",
+                    tab_style={"backgroundColor": "#121212", "borderColor": "#0A0A0A"},
+                    label_style={"color": CUSTOM_COLOR_PALETTE[2]}
+                ),
+            ],
+            id="raw-data-tabs",
+            active_tab="tab-1",
+            className="tabs-panel-new-theme"
         )
     ],
     width=12,
     className="main-content-new-theme"
 )
 
-# --- Page Routing Callback ---
-@app.callback(
-    Output('page-content', 'children'),
-    [Input('url', 'pathname')]
+# --- Layout for the Settings Page ---
+settings_layout = dbc.Col(
+    [
+        dbc.Row(
+            dbc.Col(
+                html.H2("⚙️ Configuration & Settings", className="section-title-new-theme text-center mb-4", style={'color': 'var(--accent-gold)', 'textShadow': 'var(--glow-gold)'}),
+                width=12
+            )
+        ),
+        dbc.Row([
+            dbc.Col(
+                dbc.Card(
+                    dbc.CardBody([
+                        html.H5("Data Refresh Settings", className="card-title-new-theme text-center mb-3"),
+                        html.P("Force a manual data refresh from Google Sheets.", className="card-text-new-theme text-center"),
+                        dbc.Button(
+                            [html.I(className="bi bi-arrow-repeat me-2"), "Refresh Data"],
+                            id="refresh-button", n_clicks=0,
+                            className="btn-primary-new-theme w-100"
+                        ),
+                        html.Div(id="refresh-status", className="text-center mt-3", style={"fontStyle": "italic", "color": "var(--accent-lime)"})
+                    ]),
+                    className="card-panel-new-theme"
+                ),
+                lg=6, md=12, className="mb-4"
+            ),
+            dbc.Col(
+                dbc.Card(
+                    dbc.CardBody([
+                        html.H5("About This Dashboard", className="card-title-new-theme text-center mb-3"),
+                        html.P("This dashboard is built with Dash and Python to visualize personal finance data from Google Sheets.", className="card-text-new-theme"),
+                        html.P("Developed by Venke", className="card-text-new-theme text-muted"),
+                    ]),
+                    className="card-panel-new-theme"
+                ),
+                lg=6, md=12, className="mb-4"
+            )
+        ])
+    ],
+    width=12,
+    className="main-content-new-theme"
 )
+
+
+# --- Callbacks ---
+
+@app.callback(
+    [Output('stored-icic-data', 'data'),
+     Output('stored-canara-data', 'data'),
+     Output('stored-investments-data', 'data'),
+     Output('loading-error-message', 'data'),
+     Output("data-load-status", "children")],
+    [Input('interval-component', 'n_intervals'),
+     Input('refresh-button', 'n_clicks')]
+)
+def fetch_and_store_data(n_intervals, n_clicks):
+    if n_intervals == 0 and n_clicks == 0:
+        # Initial load, don't show loading message immediately
+        data_status = ""
+    else:
+        data_status = html.Div([
+            dbc.Spinner(size="sm"),
+            html.Span("  Loading new data...", className="ms-2")
+        ], className="data-load-alert loading-message")
+
+    df_icic, df_canara, df_investments, error_msg = load_data_from_google_sheets()
+
+    if error_msg:
+        # If there's an error, don't update data stores, just the error message
+        return no_update, no_update, no_update, error_msg, html.Div(error_msg, className="data-load-alert error-message")
+    
+    # Store data as JSON strings
+    icic_json = df_icic.to_json(date_format='iso', orient='split') if not df_icic.empty else None
+    canara_json = df_canara.to_json(date_format='iso', orient='split') if not df_canara.empty else None
+    investments_json = df_investments.to_json(date_format='iso', orient='split') if not df_investments.empty else None
+
+    # Clear status message after successful load
+    data_status = html.Div("Data loaded successfully! ✅", className="data-load-alert success-message")
+    
+    return icic_json, canara_json, investments_json, None, data_status
+
+
+@app.callback(Output('page-content', 'children'),
+              Input('url', 'pathname'))
 def display_page(pathname):
     if pathname == '/savings':
         return savings_monitor_layout
     elif pathname == '/analytics':
-        return analytics_page_layout
+        return analytics_trends_layout
     elif pathname == '/data-table':
-        return data_table_layout
+        return raw_data_table_layout
     elif pathname == '/investments':
-        return investments_page_layout
+        return investments_layout
     elif pathname == '/settings':
-        return settings_page_layout
+        return settings_layout
     else:
         return dashboard_page_layout
 
-# --- Main Callback to Load Data on Page Load/Interval ---
-@app.callback(
-    Output('stored-icic-data', 'data'),
-    Output('stored-canara-data', 'data'),
-    Output('stored-investments-data', 'data'),
-    Output('loading-error-message', 'data'),
-    Input('interval-component', 'n_intervals'),
-    Input('reload-data-button', 'n_clicks')
-)
-def fetch_data(n_intervals, n_clicks):
-    if n_intervals is None and n_clicks is None:
-        return no_update, no_update, no_update, no_update
-    
-    df_icic, df_canara, df_investments, error_message = load_data_from_google_sheets()
-    
-    icic_data = df_icic.to_dict('records') if not df_icic.empty else []
-    canara_data = df_canara.to_dict('records') if not df_canara.empty else []
-    investments_data = df_investments.to_dict('records') if not df_investments.empty else []
-    
-    return icic_data, canara_data, investments_data, error_message
+# --- Main Dashboard Page Callbacks ---
 
-# --- Callback to display data loading status ---
 @app.callback(
-    Output('data-load-status', 'children'),
-    [Input('loading-error-message', 'data')]
+    [Output("month-filter", "options"),
+     Output("category-filter", "options")],
+    Input("stored-icic-data", "data")
 )
-def display_data_status(error_message):
-    if error_message:
-        return dbc.Alert(error_message, color="danger", dismissable=True, duration=5000, className="text-center w-100")
-    else:
-        return html.Div()
+def populate_main_filters(icic_json):
+    if icic_json:
+        df_icic = pd.read_json(icic_json, orient='split')
+        months = sorted(df_icic["Month"].unique())
+        categories = sorted(df_icic["Category"].unique())
+        month_options = [{"label": m, "value": m} for m in months]
+        category_options = [{"label": c, "value": c} for c in categories]
+        return month_options, category_options
+    return [], []
 
-# --- Callback to reset filters ---
 @app.callback(
     [Output("month-filter", "value"),
-     Output("category-filter", "value"),
-     Output("savings-month-filter", "value"),
-     Output("savings-category-filter", "value"),
-     Output("investments-month-filter", "value"),
-     Output("investments-category-filter", "value"),
-     Output("analytics-month-filter", "value"),
-     Output("analytics-category-filter", "value")],
-    [Input("reset-filters-button", "n_clicks"),
-     Input("savings-reset-filters-button", "n_clicks"),
-     Input("investments-reset-filters-button", "n_clicks")]
+     Output("category-filter", "value")],
+    Input("reset-filters-button", "n_clicks")
 )
-def reset_filters(n1, n2, n3):
-    return None, None, None, None, None, None, None, None
+def reset_main_filters(n_clicks):
+    if n_clicks > 0:
+        return None, None
+    return no_update, no_update
 
-
-# --- Callback for Dashboard page ---
 @app.callback(
-    Output("month-filter", "options"),
-    Output("category-filter", "options"),
-    Output("total-expenses-kpi", "children"),
-    Output("avg-monthly-kpi", "children"),
-    Output("highest-month-kpi-name", "children"),
-    Output("highest-month-kpi-value", "children"),
-    Output("lowest-month-kpi-name", "children"),
-    Output("lowest-month-kpi-value", "children"),
-    Output("monthly-expenses-trend-chart", "figure"),
-    Output("top-expense-categories-chart", "figure"),
-    Output("monthly-expenses-by-category-chart", "figure"),
-    Output("overview-data-table", "data"),
-    Input("stored-icic-data", "data"),
-    Input("month-filter", "value"),
-    Input("category-filter", "value"),
+    [Output("total-expenses-kpi", "children"),
+     Output("avg-monthly-kpi", "children"),
+     Output("highest-month-kpi-name", "children"),
+     Output("highest-month-kpi-value", "children"),
+     Output("lowest-month-kpi-name", "children"),
+     Output("lowest-month-kpi-value", "children"),
+     Output("monthly-expenses-trend-chart", "figure"),
+     Output("top-expense-categories-chart", "figure"),
+     Output("monthly-expenses-by-category-chart", "figure"),
+     Output("overview-data-table", "data"),
+     Output("overview-data-table", "columns")],
+    [Input("stored-icic-data", "data"),
+     Input("month-filter", "value"),
+     Input("category-filter", "value")]
 )
-def update_dashboard_page(icic_data, selected_months, selected_categories):
-    if not icic_data:
-        return (
-            [],
-            [],
-            "₹0.00",
-            "₹0.00",
-            "N/A",
-            "₹0.00",
-            "N/A",
-            "₹0.00",
-            {},
-            {},
-            {},
-            [],
-        )
-
-    df_icic = pd.DataFrame(icic_data)
-    df_icic["Amount"] = pd.to_numeric(df_icic["Amount"], errors="coerce").fillna(0)
-
-    # Filtering
-    if selected_months:
-        filtered_df = df_icic[df_icic["Month"].isin(selected_months)]
-    else:
+def update_main_dashboard(icic_json, selected_months, selected_categories):
+    if icic_json:
+        df_icic = pd.read_json(icic_json, orient='split')
+        
+        # Filtering logic
         filtered_df = df_icic.copy()
-    if selected_categories:
-        filtered_df = filtered_df[filtered_df["Category"].isin(selected_categories)]
-
-    # Dynamic Dropdown Options
-    month_options = sorted(list(df_icic["Month"].unique()))
-    category_options = sorted(list(df_icic["Category"].unique()))
-
-    # KPI Calculations
-    total_expenses = filtered_df["Amount"].sum()
-    monthly_expenses = filtered_df.groupby("Month")["Amount"].sum().reset_index()
-    avg_monthly_kpi_value = monthly_expenses["Amount"].mean()
-    highest_month = monthly_expenses.loc[monthly_expenses["Amount"].idxmax()] if not monthly_expenses.empty else {"Month": "N/A", "Amount": 0}
-    lowest_month = monthly_expenses.loc[monthly_expenses["Amount"].idxmin()] if not monthly_expenses.empty else {"Month": "N/A", "Amount": 0}
-
-    # Chart 1: Monthly Expenses Trend
-    line_chart = px.line(
-        monthly_expenses,
-        x="Month",
-        y="Amount",
-        title=f"<span style='color:{CUSTOM_COLOR_PALETTE[0]}'>Monthly Expenses Trend</span>",
-        markers=True,
-        color_discrete_sequence=[CUSTOM_COLOR_PALETTE[0]],
-        labels={"Amount": "Amount (₹)", "Month": "Month"},
-        template="plotly_dark",
-    )
-    line_chart.update_layout(
-        title_x=0.5,
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
-        font=dict(color=CUSTOM_COLOR_PALETTE[0]),
-        yaxis_title="Amount (₹)",
-        xaxis_title="Month",
-    )
-
-    # Chart 2: Top Expense Categories
-    category_summary = filtered_df.groupby("Category")["Amount"].sum().sort_values(ascending=False).head(10).reset_index()
-    pie_chart = px.pie(
-        category_summary,
-        names="Category",
-        values="Amount",
-        title=f"<span style='color:{CUSTOM_COLOR_PALETTE[1]}'>Top 10 Expense Categories</span>",
-        color_discrete_sequence=CUSTOM_COLOR_PALETTE,
-        template="plotly_dark",
-    )
-    pie_chart.update_layout(
-        title_x=0.5,
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
-        font=dict(color=CUSTOM_COLOR_PALETTE[0]),
-        legend_title="Categories",
-    )
-    pie_chart.update_traces(textposition='inside', textinfo='percent+label', marker=dict(line=dict(color='rgba(0,0,0,0)', width=1)))
-
-
-    # Chart 3: Monthly Expenses by Category
-    monthly_category_summary = filtered_df.groupby(["Month", "Category"])["Amount"].sum().reset_index()
-    bar_chart = px.bar(
-        monthly_category_summary,
-        x="Month",
-        y="Amount",
-        color="Category",
-        title=f"<span style='color:{CUSTOM_COLOR_PALETTE[2]}'>Monthly Expenses Breakdown by Category</span>",
-        barmode="group",
-        color_discrete_sequence=CUSTOM_COLOR_PALETTE,
-        labels={"Amount": "Amount (₹)", "Month": "Month", "Category": "Category"},
-        template="plotly_dark",
-    )
-    bar_chart.update_layout(
-        title_x=0.5,
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
-        font=dict(color=CUSTOM_COLOR_PALETTE[0]),
-        yaxis_title="Amount (₹)",
-        xaxis_title="Month",
-    )
-
-    # Data Table
-    table_data = filtered_df.to_dict('records')
-    table_columns = [{"name": i, "id": i} for i in filtered_df.columns]
-
-    return (
-        month_options,
-        category_options,
-        f"₹{total_expenses:,.2f}",
-        f"₹{avg_monthly_kpi_value:,.2f}",
-        f"{highest_month['Month']}",
-        f"₹{highest_month['Amount']:,.2f}",
-        f"{lowest_month['Month']}",
-        f"₹{lowest_month['Amount']:,.2f}",
-        line_chart,
-        pie_chart,
-        bar_chart,
-        table_data,
-    )
-
-
-# --- Callback for Savings Monitor Page ---
-@app.callback(
-    Output("savings-month-filter", "options"),
-    Output("savings-category-filter", "options"),
-    Output("total-savings-credit-kpi", "children"),
-    Output("total-savings-debit-kpi", "children"),
-    Output("net-savings-kpi", "children"),
-    Output("savings-monthly-trend-chart", "figure"),
-    Output("savings-category-bar-chart", "figure"),
-    Output("savings-data-table", "data"),
-    Input("stored-canara-data", "data"),
-    Input("savings-month-filter", "value"),
-    Input("savings-category-filter", "value"),
-)
-def update_savings_page(canara_data, selected_months, selected_categories):
-    if not canara_data:
-        return (
-            [],
-            [],
-            "₹0.00",
-            "₹0.00",
-            "₹0.00",
-            {},
-            {},
-            [],
-        )
-
-    df_canara = pd.DataFrame(canara_data)
-
-    # Filtering
-    if selected_months:
-        filtered_df = df_canara[df_canara["Month"].isin(selected_months)]
-    else:
-        filtered_df = df_canara.copy()
-
-    if selected_categories:
-        filtered_df = filtered_df[filtered_df["Category"].isin(selected_categories)]
-
-    # Dynamic Dropdown Options
-    month_options = sorted(list(df_canara["Month"].unique()))
-    category_options = sorted(list(df_canara["Category"].unique()))
-    
-    # KPI Calculations
-    total_credits = filtered_df["Credit"].sum()
-    total_debits = filtered_df["Debit"].sum()
-    net_savings = total_credits - total_debits
-
-    # Chart 1: Savings Monthly Trend
-    monthly_savings = filtered_df.groupby("Month").agg(
-        Total_Credit=("Credit", "sum"),
-        Total_Debit=("Debit", "sum")
-    ).reset_index()
-    monthly_savings["Net_Savings"] = monthly_savings["Total_Credit"] - monthly_savings["Total_Debit"]
-
-    trend_chart = go.Figure()
-    trend_chart.add_trace(go.Scatter(
-        x=monthly_savings["Month"],
-        y=monthly_savings["Total_Credit"],
-        mode='lines+markers',
-        name='Total Credit',
-        line=dict(color=CUSTOM_COLOR_PALETTE[0])
-    ))
-    trend_chart.add_trace(go.Scatter(
-        x=monthly_savings["Month"],
-        y=monthly_savings["Total_Debit"],
-        mode='lines+markers',
-        name='Total Debit',
-        line=dict(color=CUSTOM_COLOR_PALETTE[1])
-    ))
-    trend_chart.add_trace(go.Bar(
-        x=monthly_savings["Month"],
-        y=monthly_savings["Net_Savings"],
-        name='Net Savings',
-        marker_color=CUSTOM_COLOR_PALETTE[2]
-    ))
-    trend_chart.update_layout(
-        title=f"<span style='color:{CUSTOM_COLOR_PALETTE[0]}'>Monthly Savings Trend</span>",
-        title_x=0.5,
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
-        font=dict(color=CUSTOM_COLOR_PALETTE[0]),
-        legend_title="Metric",
-        yaxis_title="Amount (₹)",
-        xaxis_title="Month",
-        template="plotly_dark",
-    )
-
-    # Chart 2: Savings by Category (Bar Chart)
-    category_summary = filtered_df.groupby("Category").agg(
-        Total_Credit=("Credit", "sum"),
-        Total_Debit=("Debit", "sum")
-    ).reset_index()
-
-    bar_chart = px.bar(
-        category_summary,
-        x="Category",
-        y=["Total_Credit", "Total_Debit"],
-        title=f"<span style='color:{CUSTOM_COLOR_PALETTE[1]}'>Credits vs Debits by Category</span>",
-        barmode="group",
-        color_discrete_sequence=[CUSTOM_COLOR_PALETTE[0], CUSTOM_COLOR_PALETTE[1]],
-        labels={"value": "Amount (₹)", "variable": "Transaction Type", "Category": "Category"},
-        template="plotly_dark",
-    )
-    bar_chart.update_layout(
-        title_x=0.5,
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
-        font=dict(color=CUSTOM_COLOR_PALETTE[0]),
-        yaxis_title="Amount (₹)",
-        xaxis_title="Category",
-    )
-    
-    # Data Table
-    table_data = filtered_df.to_dict('records')
-    table_columns = [{"name": i, "id": i} for i in filtered_df.columns]
-
-    return (
-        month_options,
-        category_options,
-        f"₹{total_credits:,.2f}",
-        f"₹{total_debits:,.2f}",
-        f"₹{net_savings:,.2f}",
-        trend_chart,
-        bar_chart,
-        table_data,
-    )
-
-# --- Callback for Investments Page ---
-@app.callback(
-    Output("investments-month-filter", "options"),
-    Output("investments-category-filter", "options"),
-    Output("total-investments-kpi", "children"),
-    Output("avg-monthly-investment-kpi", "children"),
-    Output("highest-investments-kpi-name", "children"),
-    Output("highest-investments-kpi-value", "children"),
-    Output("investments-pie-chart", "figure"),
-    Output("investments-bar-chart", "figure"),
-    Output("investments-data-table", "data"),
-    Input("stored-investments-data", "data"),
-    Input("investments-month-filter", "value"),
-    Input("investments-category-filter", "value")
-)
-def update_investments_page(investments_data, selected_months, selected_categories):
-    if not investments_data:
-        return (
-            [],
-            [],
-            "₹0.00",
-            "₹0.00",
-            "N/A",
-            "₹0.00",
-            {},
-            {},
-            [],
-        )
-
-    df_investments = pd.DataFrame(investments_data)
-    df_investments["Amount"] = pd.to_numeric(df_investments["Amount"], errors="coerce").fillna(0)
-
-    # Filtering
-    filtered_df = df_investments.copy()
-    if selected_months:
-        filtered_df = filtered_df[filtered_df["Month"].isin(selected_months)]
-    if selected_categories:
-        filtered_df = filtered_df[filtered_df["Category"].isin(selected_categories)]
-
-    # Dynamic Dropdown Options
-    month_options = sorted(list(df_investments["Month"].unique()))
-    category_options = sorted(list(df_investments["Category"].unique()))
-
-    # KPI Calculations
-    total_investments = filtered_df["Amount"].sum()
-    monthly_summary = filtered_df.groupby("Month")["Amount"].sum()
-    avg_monthly_investment = monthly_summary.mean() if not monthly_summary.empty else 0
-    category_summary = filtered_df.groupby("Category")["Amount"].sum()
-    highest_category = category_summary.idxmax() if not category_summary.empty else "N/A"
-    highest_category_value = category_summary.max() if not category_summary.empty else 0
-
-    # Chart 1: Investment Category Pie Chart
-    pie_chart = px.pie(
-        filtered_df,
-        names="Category",
-        values="Amount",
-        title=f"<span style='color:{CUSTOM_COLOR_PALETTE[0]}'>Investment Breakdown by Category</span>",
-        color_discrete_sequence=CUSTOM_COLOR_PALETTE,
-        template="plotly_dark",
-    )
-    pie_chart.update_layout(
-        title_x=0.5,
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
-        font=dict(color=CUSTOM_COLOR_PALETTE[0]),
-    )
-    pie_chart.update_traces(textposition='inside', textinfo='percent+label', marker=dict(line=dict(color='rgba(0,0,0,0)', width=1)))
-
-    # Chart 2: Monthly Investment Bar Chart
-    monthly_category_summary = filtered_df.groupby(["Month", "Category"])["Amount"].sum().reset_index()
-    bar_chart = px.bar(
-        monthly_category_summary,
-        x="Month",
-        y="Amount",
-        color="Category",
-        title=f"<span style='color:{CUSTOM_COLOR_PALETTE[1]}'>Monthly Investments Breakdown by Category</span>",
-        barmode="group",
-        color_discrete_sequence=CUSTOM_COLOR_PALETTE,
-        labels={"Amount": "Amount (₹)", "Month": "Month", "Category": "Category"},
-        template="plotly_dark",
-    )
-    bar_chart.update_layout(
-        title_x=0.5,
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
-        font=dict(color=CUSTOM_COLOR_PALETTE[0]),
-        yaxis_title="Amount (₹)",
-        xaxis_title="Month",
-    )
-
-    # Data Table
-    table_data = filtered_df.to_dict('records')
-    table_columns = [{"name": i, "id": i} for i in filtered_df.columns]
-
-    return (
-        month_options,
-        category_options,
-        f"₹{total_investments:,.2f}",
-        f"₹{avg_monthly_investment:,.2f}",
-        f"{highest_category}",
-        f"₹{highest_category_value:,.2f}",
-        pie_chart,
-        bar_chart,
-        table_data,
-    )
-
-
-# --- Callback for Analytics & Trends Page ---
-@app.callback(
-    Output("analytics-month-filter", "options"),
-    Output("analytics-category-filter", "options"),
-    Output("analytics-chart", "figure"),
-    Input("stored-icic-data", "data"),
-    Input("chart-type-dropdown", "value"),
-    Input("analytics-month-filter", "value"),
-    Input("analytics-category-filter", "value"),
-)
-def update_analytics_page(icic_data, chart_type, selected_months, selected_categories):
-    if not icic_data:
-        return (
-            [],
-            [],
-            {},
-        )
-
-    df_icic = pd.DataFrame(icic_data)
-    df_icic["Amount"] = pd.to_numeric(df_icic["Amount"], errors="coerce").fillna(0)
-    
-    # Dynamic Dropdown Options
-    month_options = sorted(list(df_icic["Month"].unique()))
-    category_options = sorted(list(df_icic["Category"].unique()))
-
-    # Filtering
-    if selected_months:
-        filtered_df = df_icic[df_icic["Month"].isin(selected_months)]
-    else:
-        filtered_df = df_icic.copy()
-    if selected_categories:
-        filtered_df = filtered_df[filtered_df["Category"].isin(selected_categories)]
-
-    # Generate Chart
-    monthly_category_summary = filtered_df.groupby(["Month", "Category"])["Amount"].sum().reset_index()
-
-    if chart_type == 'line':
-        fig = px.line(
-            monthly_category_summary,
+        if selected_months:
+            filtered_df = filtered_df[filtered_df['Month'].isin(selected_months)]
+        if selected_categories:
+            filtered_df = filtered_df[filtered_df['Category'].isin(selected_categories)]
+        
+        # KPI calculations
+        total_expenses = filtered_df["Amount"].sum()
+        
+        monthly_summary = filtered_df.groupby("Month")["Amount"].sum().reset_index()
+        avg_monthly_expense = monthly_summary["Amount"].mean() if not monthly_summary.empty else 0
+        
+        if not monthly_summary.empty:
+            highest_month = monthly_summary.loc[monthly_summary["Amount"].idxmax()]
+            lowest_month = monthly_summary.loc[monthly_summary["Amount"].idxmin()]
+            highest_month_name = highest_month["Month"]
+            highest_month_value = highest_month["Amount"]
+            lowest_month_name = lowest_month["Month"]
+            lowest_month_value = lowest_month["Amount"]
+        else:
+            highest_month_name, highest_month_value, lowest_month_name, lowest_month_value = "N/A", 0, "N/A", 0
+            
+        # Charts
+        # Trend Chart
+        monthly_trend = filtered_df.groupby("Month")["Amount"].sum().reset_index()
+        line_chart = px.line(
+            monthly_trend,
             x="Month",
             y="Amount",
-            color="Category",
-            title=f"<span style='color:{CUSTOM_COLOR_PALETTE[0]}'>Monthly Expenses Trend by Category</span>",
-            markers=True,
+            title=f"<span style='color:{CUSTOM_COLOR_PALETTE[0]}'>Monthly Expense Trend</span>",
+            labels={"Amount": "Expenses (₹)", "Month": "Month"},
+            template="plotly_dark"
+        )
+        line_chart.update_traces(line=dict(color=CUSTOM_COLOR_PALETTE[0], width=4), mode="lines+markers", marker=dict(size=8, color=CUSTOM_COLOR_PALETTE[0]))
+        line_chart.update_layout(
+            title_x=0.5, 
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(color=CUSTOM_COLOR_PALETTE[0]),
+            yaxis_title="Expenses (₹)",
+            xaxis_title="Month"
+        )
+        
+        # Pie Chart
+        category_summary = filtered_df.groupby("Category")["Amount"].sum().reset_index()
+        pie_chart = px.pie(
+            category_summary,
+            names="Category",
+            values="Amount",
+            title=f"<span style='color:{CUSTOM_COLOR_PALETTE[1]}'>Top Expense Categories</span>",
             color_discrete_sequence=CUSTOM_COLOR_PALETTE,
-            labels={"Amount": "Amount (₹)", "Month": "Month", "Category": "Category"},
             template="plotly_dark",
         )
-    elif chart_type == 'area':
-        fig = px.area(
-            monthly_category_summary,
-            x="Month",
-            y="Amount",
-            color="Category",
-            title=f"<span style='color:{CUSTOM_COLOR_PALETTE[0]}'>Monthly Expenses Area Chart by Category</span>",
-            color_discrete_sequence=CUSTOM_COLOR_PALETTE,
-            labels={"Amount": "Amount (₹)", "Month": "Month", "Category": "Category"},
-            template="plotly_dark",
+        pie_chart.update_layout(
+            title_x=0.5,
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(color=CUSTOM_COLOR_PALETTE[0])
         )
-    elif chart_type == 'bar':
-        fig = px.bar(
+        
+        # Bar Chart
+        monthly_category_summary = filtered_df.groupby(["Month", "Category"])["Amount"].sum().reset_index()
+        bar_chart = px.bar(
             monthly_category_summary,
             x="Month",
             y="Amount",
             color="Category",
-            title=f"<span style='color:{CUSTOM_COLOR_PALETTE[0]}'>Monthly Expenses Breakdown by Category</span>",
+            title=f"<span style='color:{CUSTOM_COLOR_PALETTE[2]}'>Monthly Expenses Breakdown by Category</span>",
             barmode="group",
             color_discrete_sequence=CUSTOM_COLOR_PALETTE,
-            labels={"Amount": "Amount (₹)", "Month": "Month", "Category": "Category"},
+            labels={"Amount": "Expenses (₹)", "Month": "Month"},
             template="plotly_dark",
         )
-    else:
-        fig = {}
+        bar_chart.update_layout(
+            title_x=0.5,
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(color=CUSTOM_COLOR_PALETTE[0]),
+            yaxis_title="Expenses (₹)",
+            xaxis_title="Month"
+        )
 
-    fig.update_layout(
-        title_x=0.5,
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
-        font=dict(color=CUSTOM_COLOR_PALETTE[0]),
-        yaxis_title="Amount (₹)",
-        xaxis_title="Month",
-    )
+        # Data Table
+        table_data = filtered_df.to_dict('records')
+        table_columns = [{"name": i, "id": i} for i in filtered_df.columns]
 
-    return (
-        month_options,
-        category_options,
-        fig,
-    )
+        return (
+            f"₹{total_expenses:,.2f}",
+            f"₹{avg_monthly_expense:,.2f}",
+            highest_month_name,
+            f"₹{highest_month_value:,.2f}",
+            lowest_month_name,
+            f"₹{lowest_month_value:,.2f}",
+            line_chart,
+            pie_chart,
+            bar_chart,
+            table_data,
+            table_columns
+        )
+        
+    # Return empty values if no data is loaded
+    return "₹0.00", "₹0.00", "N/A", "₹0.00", "N/A", "₹0.00", go.Figure(), go.Figure(), go.Figure(), [], []
 
 
-# --- Callback for Raw Data Tables Page ---
+# --- Savings Monitor Page Callbacks ---
+
 @app.callback(
-    Output("raw-icic-table", "data"),
-    Output("raw-icic-table", "columns"),
-    Output("raw-canara-table", "data"),
-    Output("raw-canara-table", "columns"),
-    Output("raw-investments-table", "data"),
-    Output("raw-investments-table", "columns"),
-    Input("stored-icic-data", "data"),
-    Input("stored-canara-data", "data"),
-    Input("stored-investments-data", "data"),
+    [Output("savings-month-filter", "options"),
+     Output("savings-category-filter", "options")],
+    Input("stored-canara-data", "data")
 )
-def update_raw_tables(icic_data, canara_data, investments_data):
-    icic_df = pd.DataFrame(icic_data) if icic_data else pd.DataFrame()
-    canara_df = pd.DataFrame(canara_data) if canara_data else pd.DataFrame()
-    investments_df = pd.DataFrame(investments_data) if investments_data else pd.DataFrame()
+def populate_savings_filters(canara_json):
+    if canara_json:
+        df_canara = pd.read_json(canara_json, orient='split')
+        months = sorted(df_canara["Month"].unique())
+        categories = sorted(df_canara["Category"].unique())
+        month_options = [{"label": m, "value": m} for m in months]
+        category_options = [{"label": c, "value": c} for c in categories]
+        return month_options, category_options
+    return [], []
 
-    icic_cols = [{"name": i, "id": i} for i in icic_df.columns]
-    canara_cols = [{"name": i, "id": i} for i in canara_df.columns]
-    investments_cols = [{"name": i, "id": i} for i in investments_df.columns]
-
-    return (
-        icic_df.to_dict('records'),
-        icic_cols,
-        canara_df.to_dict('records'),
-        canara_cols,
-        investments_df.to_dict('records'),
-        investments_cols,
-    )
+@app.callback(
+    [Output("savings-month-filter", "value"),
+     Output("savings-category-filter", "value")],
+    Input("savings-reset-filters-button", "n_clicks")
+)
+def reset_savings_filters(n_clicks):
+    if n_clicks > 0:
+        return None, None
+    return no_update, no_update
 
 
-# --- Callback for Savings Goal Calculator ---
+@app.callback(
+    [Output("total-savings-credit-kpi", "children"),
+     Output("total-savings-debit-kpi", "children"),
+     Output("net-savings-kpi", "children"),
+     Output("savings-monthly-trend-chart", "figure"),
+     Output("savings-category-bar-chart", "figure"),
+     Output("savings-data-table", "data"),
+     Output("savings-data-table", "columns")],
+    [Input("stored-canara-data", "data"),
+     Input("savings-month-filter", "value"),
+     Input("savings-category-filter", "value")]
+)
+def update_savings_monitor(canara_json, selected_months, selected_categories):
+    if canara_json:
+        df_canara = pd.read_json(canara_json, orient='split')
+        
+        filtered_df = df_canara.copy()
+        if selected_months:
+            filtered_df = filtered_df[filtered_df['Month'].isin(selected_months)]
+        if selected_categories:
+            filtered_df = filtered_df[filtered_df['Category'].isin(selected_categories)]
+        
+        # KPI Calculations
+        total_credit = filtered_df["Credit"].sum()
+        total_debit = filtered_df["Debit"].sum()
+        net_savings = total_credit - total_debit
+
+        # Charts
+        # Monthly Trend (Credit and Debit on same chart)
+        monthly_summary = filtered_df.groupby("Month")[["Credit", "Debit"]].sum().reset_index()
+        monthly_summary_melt = monthly_summary.melt(id_vars=["Month"], var_name="Transaction Type", value_name="Amount")
+        
+        line_chart = px.line(
+            monthly_summary_melt,
+            x="Month",
+            y="Amount",
+            color="Transaction Type",
+            title=f"<span style='color:{CUSTOM_COLOR_PALETTE[0]}'>Monthly Savings and Withdrawals Trend</span>",
+            labels={"Amount": "Amount (₹)", "Month": "Month"},
+            template="plotly_dark",
+            color_discrete_map={"Credit": CUSTOM_COLOR_PALETTE[0], "Debit": CUSTOM_COLOR_PALETTE[1]},
+        )
+        line_chart.update_layout(
+            title_x=0.5,
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(color=CUSTOM_COLOR_PALETTE[0]),
+            yaxis_title="Amount (₹)",
+            xaxis_title="Month"
+        )
+
+        # Category Breakdown
+        category_summary = filtered_df.groupby("Category")["Credit"].sum().reset_index()
+        category_summary = category_summary.sort_values(by="Credit", ascending=False)
+        
+        bar_chart = px.bar(
+            category_summary,
+            x="Category",
+            y="Credit",
+            title=f"<span style='color:{CUSTOM_COLOR_PALETTE[1]}'>Savings by Category</span>",
+            color="Category",
+            color_discrete_sequence=CUSTOM_COLOR_PALETTE,
+            labels={"Credit": "Total Savings (₹)", "Category": "Category"},
+            template="plotly_dark",
+        )
+        bar_chart.update_layout(
+            title_x=0.5,
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(color=CUSTOM_COLOR_PALETTE[0]),
+            yaxis_title="Total Savings (₹)",
+            xaxis_title="Category"
+        )
+        
+        # Data Table
+        table_data = filtered_df.to_dict('records')
+        table_columns = [{"name": i, "id": i} for i in filtered_df.columns]
+        
+        return (
+            f"₹{total_credit:,.2f}",
+            f"₹{total_debit:,.2f}",
+            f"₹{net_savings:,.2f}",
+            line_chart,
+            bar_chart,
+            table_data,
+            table_columns
+        )
+
+    return "₹0.00", "₹0.00", "₹0.00", go.Figure(), go.Figure(), [], []
+
+# --- Savings Goal Calculator Callback ---
 @app.callback(
     Output("savings-goal-output", "children"),
-    Input("calculate-goal-button", "n_clicks"),
-    State("stored-canara-data", "data"),
-    State("target-amount-input", "value"),
-    State("duration-input", "value")
+    [Input("calculate-goal-button", "n_clicks")],
+    [State("target-amount-input", "value"),
+     State("duration-input", "value"),
+     State("stored-canara-data", "data")]
 )
-def calculate_savings_goal(n_clicks, canara_data, target_amount, duration):
-    if n_clicks is None or not canara_data:
+def calculate_savings_goal(n_clicks, target_amount, duration, canara_json):
+    if n_clicks is None or n_clicks == 0:
         return no_update
 
-    df_canara = pd.DataFrame(canara_data)
-    df_canara["Credit"] = pd.to_numeric(df_canara["Credit"], errors="coerce").fillna(0)
-    df_canara["Debit"] = pd.to_numeric(df_canara["Debit"], errors="coerce").fillna(0)
-    df_canara["Month"] = df_canara["Month"].astype(str).str.strip()
+    if not canara_json:
+        return html.P("No savings data available to calculate.", className="text-danger")
 
-    monthly_summary = df_canara.groupby("Month").agg(
-        Total_Credit=("Credit", "sum"),
-        Total_Debit=("Debit", "sum")
-    ).reset_index()
-    monthly_summary["Net_Savings"] = monthly_summary["Total_Credit"] - monthly_summary["Total_Debit"]
+    df_canara = pd.read_json(canara_json, orient='split')
+    monthly_summary = df_canara.groupby("Month")[["Credit", "Debit"]].sum().reset_index()
+    monthly_summary["Net Savings"] = monthly_summary["Credit"] - monthly_summary["Debit"]
     
-    historical_avg_monthly_net_savings = monthly_summary["Net_Savings"].mean()
+    if monthly_summary.empty:
+        return html.P("No historical data to calculate savings goal.", className="text-warning")
+
+    historical_avg_monthly_net_savings = monthly_summary["Net Savings"].mean()
 
     if target_amount is not None and duration is None:
         if historical_avg_monthly_net_savings <= 0:
@@ -1554,7 +1330,7 @@ def calculate_savings_goal(n_clicks, canara_data, target_amount, duration):
             f"it will take approximately {time_needed_months:,.1f} months to save ₹{target_amount:,.2f}."
         )
 
-    elif duration is not None:
+    elif duration is not None and target_amount is None:
         if duration <= 0:
             return html.P("Duration must be a positive number of months.", className="text-danger")
         
@@ -1566,10 +1342,321 @@ def calculate_savings_goal(n_clicks, canara_data, target_amount, duration):
             f"At your historical average monthly net savings of ₹{historical_avg_monthly_net_savings:,.2f}, "
             f"you will save approximately ₹{projected_savings:,.2f} in {duration} months."
         )
+        
+    elif target_amount is not None and duration is not None:
+        if duration <= 0:
+            return html.P("Duration must be a positive number of months.", className="text-danger")
+        if target_amount <= 0:
+            return html.P("Target amount must be a positive number.", className="text-danger")
+
+        monthly_contribution_needed = target_amount / duration
+        return html.P(
+            f"To save ₹{target_amount:,.2f} in {duration} months, you need to save ₹{monthly_contribution_needed:,.2f} per month.",
+            className="text-info"
+        )
     
     return html.P("Please enter valid numbers for target amount and/or duration.", className="text-danger")
 
+
+# --- Investments Page Callbacks ---
+@app.callback(
+    [Output("investments-month-filter", "options"),
+     Output("investments-category-filter", "options")],
+    Input("stored-investments-data", "data")
+)
+def populate_investments_filters(investments_json):
+    if investments_json:
+        df_investments = pd.read_json(investments_json, orient='split')
+        months = sorted(df_investments["Month"].unique())
+        categories = sorted(df_investments["Category"].unique())
+        month_options = [{"label": m, "value": m} for m in months]
+        category_options = [{"label": c, "value": c} for c in categories]
+        return month_options, category_options
+    return [], []
+
+@app.callback(
+    [Output("investments-month-filter", "value"),
+     Output("investments-category-filter", "value")],
+    Input("investments-reset-filters-button", "n_clicks")
+)
+def reset_investments_filters(n_clicks):
+    if n_clicks > 0:
+        return None, None
+    return no_update, no_update
+
+@app.callback(
+    [Output("total-investments-kpi", "children"),
+     Output("avg-monthly-investment-kpi", "children"),
+     Output("highest-category-kpi-name", "children"),
+     Output("highest-category-kpi-value", "children"),
+     Output("lowest-category-kpi-name", "children"),
+     Output("lowest-category-kpi-value", "children"),
+     Output("investments-monthly-trend-chart", "figure"),
+     Output("investments-category-pie-chart", "figure"),
+     Output("investments-monthly-by-category-chart", "figure"),
+     Output("investments-data-table", "data"),
+     Output("investments-data-table", "columns")],
+    [Input("stored-investments-data", "data"),
+     Input("investments-month-filter", "value"),
+     Input("investments-category-filter", "value")]
+)
+def update_investments_dashboard(investments_json, selected_months, selected_categories):
+    if investments_json:
+        df_investments = pd.read_json(investments_json, orient='split')
+        
+        # Filtering logic
+        filtered_df = df_investments.copy()
+        if selected_months:
+            filtered_df = filtered_df[filtered_df['Month'].isin(selected_months)]
+        if selected_categories:
+            filtered_df = filtered_df[filtered_df['Category'].isin(selected_categories)]
+            
+        # KPI calculations
+        total_investments = filtered_df["Amount"].sum()
+        
+        monthly_summary = filtered_df.groupby("Month")["Amount"].sum().reset_index()
+        avg_monthly_investment = monthly_summary["Amount"].mean() if not monthly_summary.empty else 0
+        
+        category_summary = filtered_df.groupby("Category")["Amount"].sum().reset_index()
+        if not category_summary.empty:
+            highest_category = category_summary.loc[category_summary["Amount"].idxmax()]
+            lowest_category = category_summary.loc[category_summary["Amount"].idxmin()]
+        else:
+            highest_category = {'Category': 'N/A', 'Amount': 0}
+            lowest_category = {'Category': 'N/A', 'Amount': 0}
+            
+        # Charts
+        # Trend Chart
+        line_chart = px.line(
+            monthly_summary,
+            x="Month",
+            y="Amount",
+            title=f"<span style='color:{CUSTOM_COLOR_PALETTE[0]}'>Monthly Investment Trend</span>",
+            labels={"Amount": "Amount (₹)", "Month": "Month"},
+            template="plotly_dark"
+        )
+        line_chart.update_traces(line=dict(color=CUSTOM_COLOR_PALETTE[0], width=4), mode="lines+markers", marker=dict(size=8, color=CUSTOM_COLOR_PALETTE[0]))
+        line_chart.update_layout(
+            title_x=0.5,
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(color=CUSTOM_COLOR_PALETTE[0]),
+            yaxis_title="Amount (₹)",
+            xaxis_title="Month",
+        )
+        
+        # Pie Chart
+        pie_chart = px.pie(
+            category_summary,
+            names="Category",
+            values="Amount",
+            title=f"<span style='color:{CUSTOM_COLOR_PALETTE[1]}'>Investment Categories Breakdown</span>",
+            color_discrete_sequence=CUSTOM_COLOR_PALETTE,
+            template="plotly_dark",
+        )
+        pie_chart.update_layout(
+            title_x=0.5,
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(color=CUSTOM_COLOR_PALETTE[0])
+        )
+
+        # Bar Chart
+        monthly_category_summary = filtered_df.groupby(["Month", "Category"])["Amount"].sum().reset_index()
+        bar_chart = px.bar(
+            monthly_category_summary,
+            x="Month",
+            y="Amount",
+            color="Category",
+            title=f"<span style='color:{CUSTOM_COLOR_PALETTE[2]}'>Monthly Investments Breakdown by Category</span>",
+            barmode="group",
+            color_discrete_sequence=CUSTOM_COLOR_PALETTE,
+            labels={"Amount": "Amount (₹)", "Month": "Month", "Category": "Category"},
+            template="plotly_dark",
+        )
+        bar_chart.update_layout(
+            title_x=0.5,
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(color=CUSTOM_COLOR_PALETTE[0]),
+            yaxis_title="Amount (₹)",
+            xaxis_title="Month",
+        )
+
+        # Data Table
+        table_data = filtered_df.to_dict('records')
+        table_columns = [{"name": i, "id": i} for i in filtered_df.columns]
+
+        return (
+            f"₹{total_investments:,.2f}",
+            f"₹{avg_monthly_investment:,.2f}",
+            f"{highest_category['Category']}",
+            f"₹{highest_category['Amount']:,.2f}",
+            f"{lowest_category['Category']}",
+            f"₹{lowest_category['Amount']:,.2f}",
+            line_chart,
+            pie_chart,
+            bar_chart,
+            table_data,
+            table_columns
+        )
+    
+    return "₹0.00", "₹0.00", "N/A", "₹0.00", "N/A", "₹0.00", go.Figure(), go.Figure(), go.Figure(), [], []
+
+# --- Analytics & Trends Page Callbacks ---
+@app.callback(
+    [Output("trend-category-filter", "options"),
+     Output("month-range-slider", "marks"),
+     Output("month-range-slider", "max"),
+     Output("month-range-slider", "value")],
+    Input("stored-icic-data", "data")
+)
+def populate_analytics_filters(icic_json):
+    if icic_json:
+        df_icic = pd.read_json(icic_json, orient='split')
+        categories = sorted(df_icic["Category"].unique())
+        category_options = [{"label": c, "value": c} for c in categories]
+        
+        months = sorted(df_icic["Month"].unique())
+        marks = {i: month for i, month in enumerate(months)}
+        max_val = len(months) - 1
+        value = [0, max_val]
+        
+        return category_options, marks, max_val, value
+    return [], {}, 1, [0, 1]
+
+@app.callback(
+    [Output("category-trends-chart", "figure"),
+     Output("monthly-correlation-chart", "figure"),
+     Output("category-heatmap-chart", "figure")],
+    [Input("stored-icic-data", "data"),
+     Input("trend-category-filter", "value"),
+     Input("month-range-slider", "value")]
+)
+def update_analytics_dashboard(icic_json, selected_categories, month_range_index):
+    if icic_json:
+        df_icic = pd.read_json(icic_json, orient='split')
+        months = sorted(df_icic["Month"].unique())
+        
+        start_month_idx, end_month_idx = month_range_index
+        filtered_months = months[start_month_idx:end_month_idx+1]
+        
+        filtered_df = df_icic[df_icic['Month'].isin(filtered_months)]
+        
+        if selected_categories:
+            filtered_df = filtered_df[filtered_df['Category'].isin(selected_categories)]
+
+        # Line Chart
+        monthly_trends = filtered_df.groupby(["Month", "Category"])["Amount"].sum().reset_index()
+        line_chart = px.line(
+            monthly_trends,
+            x="Month",
+            y="Amount",
+            color="Category",
+            title=f"<span style='color:{CUSTOM_COLOR_PALETTE[0]}'>Expense Trends for Selected Categories</span>",
+            labels={"Amount": "Expenses (₹)", "Month": "Month"},
+            template="plotly_dark",
+            color_discrete_sequence=CUSTOM_COLOR_PALETTE,
+        )
+        line_chart.update_layout(
+            title_x=0.5,
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(color=CUSTOM_COLOR_PALETTE[0]),
+            yaxis_title="Expenses (₹)",
+            xaxis_title="Month"
+        )
+        
+        # Scatter Plot
+        monthly_summary = filtered_df.groupby("Month")["Amount"].sum().reset_index()
+        monthly_summary["Month"] = pd.to_datetime(monthly_summary["Month"], format="%B %Y")
+        monthly_summary = monthly_summary.sort_values(by="Month")
+        monthly_summary["Lagged_Amount"] = monthly_summary["Amount"].shift(1)
+        scatter_chart = px.scatter(
+            monthly_summary.dropna(),
+            x="Lagged_Amount",
+            y="Amount",
+            title=f"<span style='color:{CUSTOM_COLOR_PALETTE[1]}'>Monthly Expenses Correlation (Month vs. Previous Month)</span>",
+            labels={"Amount": "Current Month Expenses (₹)", "Lagged_Amount": "Previous Month Expenses (₹)"},
+            template="plotly_dark",
+            color_discrete_sequence=[CUSTOM_COLOR_PALETTE[1]],
+        )
+        scatter_chart.update_layout(
+            title_x=0.5,
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(color=CUSTOM_COLOR_PALETTE[0])
+        )
+
+        # Heatmap
+        heatmap_data = filtered_df.groupby(["Month", "Category"])["Amount"].sum().unstack(fill_value=0)
+        heatmap_figure = go.Figure(data=go.Heatmap(
+            z=heatmap_data.values,
+            x=heatmap_data.columns,
+            y=heatmap_data.index,
+            colorscale=[[0, 'rgba(0,0,0,0)'], [1, CUSTOM_COLOR_PALETTE[2]]],
+            showscale=True,
+            hovertemplate="Month: %{y}<br>Category: %{x}<br>Amount: ₹%{z:,.2f}<extra></extra>"
+        ))
+        heatmap_figure.update_layout(
+            title=f"<span style='color:{CUSTOM_COLOR_PALETTE[2]}'>Expense Heatmap (Month vs. Category)</span>",
+            title_x=0.5,
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(color=CUSTOM_COLOR_PALETTE[0]),
+            xaxis_title="Category",
+            yaxis_title="Month",
+        )
+
+        return line_chart, scatter_chart, heatmap_figure
+    
+    return go.Figure(), go.Figure(), go.Figure()
+
+# --- Raw Data Tables Callbacks ---
+@app.callback(
+    [Output("icic-raw-data-table", "data"),
+     Output("icic-raw-data-table", "columns")],
+    Input("raw-data-tabs", "active_tab"),
+    State("stored-icic-data", "data")
+)
+def update_icic_raw_table(active_tab, icic_json):
+    if active_tab == "tab-1" and icic_json:
+        df = pd.read_json(icic_json, orient='split')
+        data = df.to_dict('records')
+        columns = [{"name": i, "id": i} for i in df.columns]
+        return data, columns
+    return [], []
+
+@app.callback(
+    [Output("canara-raw-data-table", "data"),
+     Output("canara-raw-data-table", "columns")],
+    Input("raw-data-tabs", "active_tab"),
+    State("stored-canara-data", "data")
+)
+def update_canara_raw_table(active_tab, canara_json):
+    if active_tab == "tab-2" and canara_json:
+        df = pd.read_json(canara_json, orient='split')
+        data = df.to_dict('records')
+        columns = [{"name": i, "id": i} for i in df.columns]
+        return data, columns
+    return [], []
+
+@app.callback(
+    [Output("investments-raw-data-table", "data"),
+     Output("investments-raw-data-table", "columns")],
+    Input("raw-data-tabs", "active_tab"),
+    State("stored-investments-data", "data")
+)
+def update_investments_raw_table(active_tab, investments_json):
+    if active_tab == "tab-3" and investments_json:
+        df = pd.read_json(investments_json, orient='split')
+        data = df.to_dict('records')
+        columns = [{"name": i, "id": i} for i in df.columns]
+        return data, columns
+    return [], []
+
+
 if __name__ == "__main__":
     from waitress import serve
-    print("Starting the Dashboard ... Loading data from Google Sheets. This may take a moment.")
-    serve(app.server, host="0.0.0.0", port=8050)
+    print("Starting the Dashboard ... Loading data from Google Sheets...")
+    serve(server, host="0.0.0.0", port=8080)
