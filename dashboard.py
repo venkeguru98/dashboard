@@ -937,59 +937,8 @@ settings_page_layout = dbc.Col(
 
 @app.callback(
     [Output('page-content', 'children'),
-     Output('last-refresh-time', 'children')],
-    [Input('url', 'pathname')]
-)
-def display_page(pathname):
-    now = time.strftime("%Y-%m-%d %H:%M:%S")
-    if pathname == '/':
-        return dashboard_page_layout, now
-    elif pathname == '/savings':
-        return savings_monitor_layout, now
-    elif pathname == '/analytics':
-        return analytics_page_layout, now
-    elif pathname == '/data-table':
-        return data_table_page_layout, now
-    elif pathname == '/investments':
-        return investments_layout, now
-    elif pathname == '/settings':
-        return settings_page_layout, now
-    # Default to dashboard page if path is not recognized
-    return dashboard_page_layout, now
-
-@app.callback(
-    [Output('stored-icic-data', 'data'),
-     Output('stored-canara-data', 'data'),
-     Output('stored-investments-data', 'data'),
-     Output('loading-error-message', 'data'),
-     Output('data-load-status', 'children')],
-    [Input('interval-component', 'n_intervals')]
-)
-def fetch_and_store_data(n_intervals):
-    df_icic, df_canara, df_investments, error_message = load_data_from_google_sheets()
-
-    status_message = ""
-    if error_message:
-        status_message = html.Div(
-            [html.I(className="bi bi-exclamation-triangle-fill me-2"), error_message],
-            className="alert alert-danger"
-        )
-    else:
-        status_message = html.Div(
-            [html.I(className="bi bi-check-circle-fill me-2"), "Data loaded successfully!"],
-            className="alert alert-success"
-        )
-    
-    return (
-        df_icic.to_json(orient='split') if not df_icic.empty else None,
-        df_canara.to_json(orient='split') if not df_canara.empty else None,
-        df_investments.to_json(orient='split') if not df_investments.empty else None,
-        error_message,
-        status_message
-    )
-
-@app.callback(
-    [Output('month-filter', 'options'),
+     Output('last-refresh-time', 'children'),
+     Output('month-filter', 'options'),
      Output('month-filter', 'value'),
      Output('category-filter', 'options'),
      Output('category-filter', 'value'),
@@ -1000,59 +949,9 @@ def fetch_and_store_data(n_intervals):
      Output('investments-month-filter', 'options'),
      Output('investments-month-filter', 'value'),
      Output('investments-category-filter', 'options'),
-     Output('investments-category-filter', 'value')],
-    [Input('stored-icic-data', 'data'),
-     Input('stored-canara-data', 'data'),
-     Input('stored-investments-data', 'data'),
-     Input('reset-filters-button', 'n_clicks'),
-     Input('savings-reset-filters-button', 'n_clicks'),
-     Input('investments-reset-filters-button', 'n_clicks')]
-)
-def update_filter_options(icic_json, canara_json, investments_json, reset_n_clicks, savings_reset_n_clicks, investments_reset_n_clicks):
-    ctx = dash.callback_context
-    if not ctx.triggered:
-        button_id = 'no_trigger'
-    else:
-        button_id = ctx.triggered[0]['prop_id'].split('.')[0]
-        
-    icic_df = pd.DataFrame()
-    if icic_json:
-        icic_df = pd.read_json(icic_json, orient='split')
-        icic_df["Month"] = icic_df["Month"].astype(str)
-    
-    canara_df = pd.DataFrame()
-    if canara_json:
-        canara_df = pd.read_json(canara_json, orient='split')
-        canara_df["Month"] = canara_df["Month"].astype(str)
-    
-    investments_df = pd.DataFrame()
-    if investments_json:
-        investments_df = pd.read_json(investments_json, orient='split')
-        investments_df["Month"] = investments_df["Month"].astype(str)
-
-    # Combine all month and category options
-    all_months = pd.unique(pd.concat([icic_df["Month"], canara_df["Month"], investments_df["Month"]])) if not (icic_df.empty and canara_df.empty and investments_df.empty) else []
-    all_categories = pd.unique(pd.concat([icic_df["Category"], canara_df["Category"], investments_df["Category"]])) if not (icic_df.empty and canara_df.empty and investments_df.empty) else []
-
-    month_options = [{"label": m, "value": m} for m in sorted(all_months)]
-    category_options = [{"label": c, "value": c} for c in sorted(all_categories)]
-    
-    # Reset values on button click
-    if button_id in ['reset-filters-button', 'savings-reset-filters-button', 'investments-reset-filters-button']:
-        return (
-            month_options, [], category_options, [],
-            month_options, [], category_options, [],
-            month_options, [], category_options, []
-        )
-    
-    return (
-        month_options, no_update, category_options, no_update,
-        month_options, no_update, category_options, no_update,
-        month_options, no_update, category_options, no_update
-    )
-
-@app.callback(
-    [Output('total-expenses-kpi', 'children'),
+     Output('investments-category-filter', 'value'),
+     Output('analytics-category-select', 'options'),
+     Output('total-expenses-kpi', 'children'),
      Output('avg-monthly-kpi', 'children'),
      Output('highest-month-kpi-name', 'children'),
      Output('highest-month-kpi-value', 'children'),
@@ -1063,15 +962,6 @@ def update_filter_options(icic_json, canara_json, investments_json, reset_n_clic
      Output('monthly-expenses-by-category-chart', 'figure'),
      Output('overview-data-table', 'data'),
      Output('overview-data-table', 'columns'),
-     Output('raw-icic-data-table', 'data'),
-     Output('raw-icic-data-table', 'columns'),
-     Output('raw-canara-data-table', 'data'),
-     Output('raw-canara-data-table', 'columns'),
-     Output('raw-investments-data-table', 'data'),
-     Output('raw-investments-data-table', 'columns'),
-     Output('expense-trend-analysis-chart', 'figure'),
-     Output('category-comparison-chart', 'figure'),
-     Output('analytics-category-select', 'options'),
      Output('total-savings-credit-kpi', 'children'),
      Output('total-savings-debit-kpi', 'children'),
      Output('net-savings-kpi', 'children'),
@@ -1087,7 +977,15 @@ def update_filter_options(icic_json, canara_json, investments_json, reset_n_clic
      Output('lowest-category-kpi-value', 'children'),
      Output('investments-monthly-trend-chart', 'figure'),
      Output('investments-category-pie-chart', 'figure'),
-     Output('investments-monthly-by-category-chart', 'figure')],
+     Output('investments-monthly-by-category-chart', 'figure'),
+     Output('raw-icic-data-table', 'data'),
+     Output('raw-icic-data-table', 'columns'),
+     Output('raw-canara-data-table', 'data'),
+     Output('raw-canara-data-table', 'columns'),
+     Output('raw-investments-data-table', 'data'),
+     Output('raw-investments-data-table', 'columns'),
+     Output('expense-trend-analysis-chart', 'figure'),
+     Output('category-comparison-chart', 'figure')],
     [Input('url', 'pathname'),
      Input('stored-icic-data', 'data'),
      Input('stored-canara-data', 'data'),
@@ -1098,276 +996,82 @@ def update_filter_options(icic_json, canara_json, investments_json, reset_n_clic
      Input('savings-category-filter', 'value'),
      Input('investments-month-filter', 'value'),
      Input('investments-category-filter', 'value'),
-     Input('analytics-category-select', 'value')]
+     Input('analytics-category-select', 'value'),
+     Input('reset-filters-button', 'n_clicks'),
+     Input('savings-reset-filters-button', 'n_clicks'),
+     Input('investments-reset-filters-button', 'n_clicks')]
 )
-def update_dashboard_content(pathname, icic_json, canara_json, investments_json, months, categories, savings_months, savings_categories, investments_months, investments_categories, analytics_categories):
+def update_full_dashboard(
+    pathname, icic_json, canara_json, investments_json, 
+    months, categories, savings_months, savings_categories,
+    investments_months, investments_categories, analytics_categories,
+    reset_clicks, savings_reset_clicks, investments_reset_clicks
+):
+    ctx = dash.callback_context
+    triggered_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else 'no_trigger'
+
     # Load and combine data
     icic_df = pd.DataFrame()
     if icic_json:
         icic_df = pd.read_json(icic_json, orient='split')
         icic_df["Amount"] = pd.to_numeric(icic_df["Amount"], errors='coerce').fillna(0)
+        icic_df["Month"] = icic_df["Month"].astype(str)
     
     canara_df = pd.DataFrame()
     if canara_json:
         canara_df = pd.read_json(canara_json, orient='split')
         canara_df["Debit"] = pd.to_numeric(canara_df["Debit"], errors='coerce').fillna(0)
         canara_df["Credit"] = pd.to_numeric(canara_df["Credit"], errors='coerce').fillna(0)
+        canara_df["Month"] = canara_df["Month"].astype(str)
         
     investments_df = pd.DataFrame()
     if investments_json:
         investments_df = pd.read_json(investments_json, orient='split')
         investments_df["Amount"] = pd.to_numeric(investments_df["Amount"], errors='coerce').fillna(0)
-        
+        investments_df["Month"] = investments_df["Month"].astype(str)
+
+    # Combine all month and category options for filters
+    all_months = pd.unique(pd.concat([icic_df["Month"], canara_df["Month"], investments_df["Month"]])) if not (icic_df.empty and canara_df.empty and investments_df.empty) else []
+    all_categories = pd.unique(pd.concat([icic_df["Category"], canara_df["Category"], investments_df["Category"]])) if not (icic_df.empty and canara_df.empty and investments_df.empty) else []
+    month_options = [{"label": m, "value": m} for m in sorted(all_months)]
+    category_options = [{"label": c, "value": c} for c in sorted(all_categories)]
+
+    # Reset filter values if a reset button was clicked
+    if triggered_id in ['reset-filters-button', 'savings-reset-filters-button', 'investments-reset-filters-button']:
+        months, categories, savings_months, savings_categories, investments_months, investments_categories = [], [], [], [], [], []
+
     # Default outputs
     default_outputs = [
         "₹0.00", "₹0.00", "N/A", "₹0.00", "N/A", "₹0.00",
-        {}, {}, {}, [], [], [], [], [], [], [], [], {}, {}, [],
+        {}, {}, {}, [], [],
         "₹0.00", "₹0.00", "₹0.00", {}, {}, [], [],
         "₹0.00", "₹0.00", "N/A", "₹0.00", "N/A", "₹0.00",
-        {}, {}, {}
+        {}, {}, {},
+        [], [], [], [], [], [],
+        {}, {}
     ]
-
-    # Handle different pages based on pathname
-    if pathname == '/savings':
-        # Savings-specific filtering
-        savings_filtered_df = canara_df.copy()
-        if savings_months:
-            savings_filtered_df = savings_filtered_df[savings_filtered_df["Month"].isin(savings_months)]
-        if savings_categories:
-            savings_filtered_df = savings_filtered_df[savings_filtered_df["Category"].isin(savings_categories)]
-            
-        # Calculate Savings KPIs
-        total_savings_credit = savings_filtered_df['Credit'].sum()
-        total_savings_debit = savings_filtered_df['Debit'].sum()
-        net_savings = total_savings_credit - total_savings_debit
-        
-        # Savings Trend Chart
-        monthly_savings_trend = savings_filtered_df.groupby("Month").agg(Credit=('Credit', 'sum'), Debit=('Debit', 'sum')).reset_index()
-        monthly_savings_trend["Net"] = monthly_savings_trend["Credit"] - monthly_savings_trend["Debit"]
-        
-        fig_savings_trend = go.Figure()
-        fig_savings_trend.add_trace(go.Bar(x=monthly_savings_trend['Month'], y=monthly_savings_trend['Credit'], name='Credit (Savings)', marker_color=CUSTOM_COLOR_PALETTE[0]))
-        fig_savings_trend.add_trace(go.Bar(x=monthly_savings_trend['Month'], y=monthly_savings_trend['Debit'], name='Debit (Withdrawals)', marker_color=CUSTOM_COLOR_PALETTE[1]))
-        fig_savings_trend.add_trace(go.Scatter(x=monthly_savings_trend['Month'], y=monthly_savings_trend['Net'], name='Net Savings', mode='lines+markers', line=dict(color=CUSTOM_COLOR_PALETTE[2], width=4)))
-        
-        fig_savings_trend.update_layout(
-            barmode='group',
-            title=f"<span style='color:{CUSTOM_COLOR_PALETTE[0]}'>Monthly Savings and Withdrawals Trend</span>",
-            xaxis_title="Month",
-            yaxis_title="Amount (₹)",
-            legend_title="Type",
-            template="plotly_dark",
-            title_x=0.5,
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(color=CUSTOM_COLOR_PALETTE[0]),
-        )
-        
-        # Savings by Category Bar Chart
-        savings_category_summary = savings_filtered_df.groupby("Category").agg(TotalCredit=('Credit', 'sum'), TotalDebit=('Debit', 'sum')).reset_index()
-        fig_savings_category_bar = go.Figure()
-        fig_savings_category_bar.add_trace(go.Bar(x=savings_category_summary['Category'], y=savings_category_summary['TotalCredit'], name='Total Credit', marker_color=CUSTOM_COLOR_PALETTE[0]))
-        fig_savings_category_bar.add_trace(go.Bar(x=savings_category_summary['Category'], y=savings_category_summary['TotalDebit'], name='Total Debit', marker_color=CUSTOM_COLOR_PALETTE[1]))
-        
-        fig_savings_category_bar.update_layout(
-            barmode='group',
-            title=f"<span style='color:{CUSTOM_COLOR_PALETTE[1]}'>Savings & Withdrawals by Category</span>",
-            xaxis_title="Category",
-            yaxis_title="Amount (₹)",
-            legend_title="Type",
-            template="plotly_dark",
-            title_x=0.5,
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(color=CUSTOM_COLOR_PALETTE[0]),
-        )
-        
-        # Data Table
-        savings_table_data = savings_filtered_df.to_dict('records')
-        savings_table_columns = [{"name": i, "id": i} for i in savings_filtered_df.columns]
-
-        return (
-            default_outputs[0:20] + 
-            [f"₹{total_savings_credit:,.2f}", f"₹{total_savings_debit:,.2f}", f"₹{net_savings:,.2f}", 
-             fig_savings_trend, fig_savings_category_bar, savings_table_data, savings_table_columns] +
-            default_outputs[27:]
-        )
     
-    elif pathname == '/investments':
-        # Investments-specific filtering
-        investments_filtered_df = investments_df.copy()
-        if investments_months:
-            investments_filtered_df = investments_filtered_df[investments_filtered_df["Month"].isin(investments_months)]
-        if investments_categories:
-            investments_filtered_df = investments_filtered_df[investments_filtered_df["Category"].isin(investments_categories)]
+    # Initialize all outputs to default values
+    outputs = [no_update] * 53
+    outputs[1] = time.strftime("%Y-%m-%d %H:%M:%S")
 
-        # Calculate Investments KPIs
-        total_investments = investments_filtered_df['Amount'].sum()
-        avg_monthly_investment = investments_filtered_df.groupby("Month")['Amount'].sum().mean() if not investments_filtered_df.empty else 0
-        
-        category_investments = investments_filtered_df.groupby('Category')['Amount'].sum().reset_index()
-        if not category_investments.empty:
-            highest_category = category_investments.loc[category_investments['Amount'].idxmax()]
-            lowest_category = category_investments.loc[category_investments['Amount'].idxmin()]
-            highest_category_name = highest_category['Category']
-            highest_category_value = f"₹{highest_category['Amount']:,.2f}"
-            lowest_category_name = lowest_category['Category']
-            lowest_category_value = f"₹{lowest_category['Amount']:,.2f}"
-        else:
-            highest_category_name = "N/A"
-            highest_category_value = "₹0.00"
-            lowest_category_name = "N/A"
-            lowest_category_value = "₹0.00"
-        
-        # Investments Trend Chart
-        monthly_investments_trend = investments_filtered_df.groupby("Month")["Amount"].sum().reset_index()
-        fig_investments_trend = px.line(
-            monthly_investments_trend,
-            x="Month",
-            y="Amount",
-            title=f"<span style='color:{CUSTOM_COLOR_PALETTE[0]}'>Monthly Investments Trend</span>",
-            labels={"Amount": "Amount (₹)", "Month": "Month"},
-            template="plotly_dark",
-            color_discrete_sequence=[CUSTOM_COLOR_PALETTE[0]]
-        )
-        fig_investments_trend.update_layout(
-            title_x=0.5,
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(color=CUSTOM_COLOR_PALETTE[0]),
-            yaxis_title="Amount (₹)"
-        )
+    # Update filter options based on available data, but don't change dropdown values
+    outputs[2], outputs[4], outputs[6], outputs[8], outputs[10], outputs[12] = (
+        month_options, category_options, month_options, category_options, month_options, category_options
+    )
+    outputs[14] = category_options
 
-        # Investments Category Pie Chart
-        category_summary = investments_filtered_df.groupby("Category")["Amount"].sum().reset_index()
-        fig_investments_pie = px.pie(
-            category_summary,
-            names="Category",
-            values="Amount",
-            title=f"<span style='color:{CUSTOM_COLOR_PALETTE[1]}'>Investments by Category</span>",
-            color_discrete_sequence=CUSTOM_COLOR_PALETTE,
-            template="plotly_dark"
-        )
-        fig_investments_pie.update_traces(textposition='inside', textinfo='percent+label')
-        fig_investments_pie.update_layout(
-            title_x=0.5,
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(color=CUSTOM_COLOR_PALETTE[0]),
-            legend_title="Category"
-        )
-        
-        # Monthly Investments by Category Bar Chart
-        monthly_category_summary = investments_filtered_df.groupby(["Month", "Category"])["Amount"].sum().reset_index()
-        fig_investments_bar = px.bar(
-            monthly_category_summary,
-            x="Month",
-            y="Amount",
-            color="Category",
-            title=f"<span style='color:{CUSTOM_COLOR_PALETTE[2]}'>Monthly Investments Breakdown by Category</span>",
-            barmode="group",
-            color_discrete_sequence=CUSTOM_COLOR_PALETTE,
-            labels={"Amount": "Amount (₹)", "Month": "Month", "Category": "Category"},
-            template="plotly_dark",
-        )
-        fig_investments_bar.update_layout(
-            title_x=0.5,
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(color=CUSTOM_COLOR_PALETTE[0]),
-            yaxis_title="Amount (₹)",
-            xaxis_title="Month",
-        )
+    # Handle filter value resets
+    if triggered_id == 'reset-filters-button':
+        outputs[3], outputs[5] = [], []
+    if triggered_id == 'savings-reset-filters-button':
+        outputs[7], outputs[9] = [], []
+    if triggered_id == 'investments-reset-filters-button':
+        outputs[11], outputs[13] = [], []
 
-        return (
-            default_outputs[0:27] + 
-            [f"₹{total_investments:,.2f}", f"₹{avg_monthly_investment:,.2f}", 
-             highest_category_name, highest_category_value, lowest_category_name, lowest_category_value,
-             fig_investments_trend, fig_investments_pie, fig_investments_bar]
-        )
-
-    elif pathname == '/data-table':
-        # Raw Data Tables
-        icic_table_data = icic_df.to_dict('records') if not icic_df.empty else []
-        icic_table_columns = [{"name": i, "id": i} for i in icic_df.columns] if not icic_df.empty else []
+    if pathname == '/':
+        outputs[0] = dashboard_page_layout
         
-        canara_table_data = canara_df.to_dict('records') if not canara_df.empty else []
-        canara_table_columns = [{"name": i, "id": i} for i in canara_df.columns] if not canara_df.empty else []
-        
-        investments_table_data = investments_df.to_dict('records') if not investments_df.empty else []
-        investments_table_columns = [{"name": i, "id": i} for i in investments_df.columns] if not investments_df.empty else []
-
-        # Return relevant data and empty outputs for other sections
-        return (
-            default_outputs[0:11] + 
-            [icic_table_data, icic_table_columns, canara_table_data, canara_table_columns, investments_table_data, investments_table_columns] +
-            default_outputs[17:]
-        )
-    
-    elif pathname == '/analytics':
-        # Analytics page filtering and charts
-        combined_df_expenses = pd.DataFrame()
-        if not icic_df.empty:
-            combined_df_expenses = pd.concat([combined_df_expenses, icic_df], ignore_index=True)
-            
-        if analytics_categories:
-            filtered_df = combined_df_expenses[combined_df_expenses["Category"].isin(analytics_categories)]
-        else:
-            filtered_df = combined_df_expenses
-        
-        # Overall Trend Analysis Chart
-        monthly_expenses_trend = filtered_df.groupby("Month")["Amount"].sum().reset_index()
-        fig_trend_analysis = px.line(
-            monthly_expenses_trend,
-            x="Month",
-            y="Amount",
-            title=f"<span style='color:{CUSTOM_COLOR_PALETTE[0]}'>Overall Expenses Trend</span>",
-            labels={"Amount": "Amount (₹)", "Month": "Month"},
-            template="plotly_dark",
-            color_discrete_sequence=[CUSTOM_COLOR_PALETTE[0]]
-        )
-        fig_trend_analysis.update_layout(
-            title_x=0.5,
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(color=CUSTOM_COLOR_PALETTE[0]),
-            yaxis_title="Amount (₹)"
-        )
-        
-        # Category Comparison Chart
-        if analytics_categories:
-            category_comparison_df = filtered_df.groupby(["Month", "Category"])["Amount"].sum().reset_index()
-            fig_category_comparison = px.line(
-                category_comparison_df,
-                x="Month",
-                y="Amount",
-                color="Category",
-                title=f"<span style='color:{CUSTOM_COLOR_PALETTE[1]}'>Monthly Expense Trend for Selected Categories</span>",
-                labels={"Amount": "Amount (₹)", "Month": "Month", "Category": "Category"},
-                template="plotly_dark",
-                color_discrete_sequence=CUSTOM_COLOR_PALETTE
-            )
-            fig_category_comparison.update_layout(
-                title_x=0.5,
-                plot_bgcolor="rgba(0,0,0,0)",
-                paper_bgcolor="rgba(0,0,0,0)",
-                font=dict(color=CUSTOM_COLOR_PALETTE[0]),
-                yaxis_title="Amount (₹)"
-            )
-        else:
-            fig_category_comparison = {}
-            
-        all_categories = pd.unique(combined_df_expenses["Category"]) if not combined_df_expenses.empty else []
-        analytics_category_options = [{"label": c, "value": c} for c in sorted(all_categories)]
-
-        return (
-            default_outputs[0:17] +
-            [fig_trend_analysis, fig_category_comparison, analytics_category_options] +
-            default_outputs[20:]
-        )
-
-    else:
-        # Default to Dashboard page logic
         combined_df = pd.DataFrame()
         if not icic_df.empty:
             combined_df = pd.concat([combined_df, icic_df], ignore_index=True)
@@ -1459,14 +1163,247 @@ def update_dashboard_content(pathname, icic_json, canara_json, investments_json,
         table_data = filtered_df.to_dict('records')
         table_columns = [{"name": i, "id": i} for i in filtered_df.columns]
         
-        return (
+        outputs[15], outputs[16], outputs[17], outputs[18], outputs[19], outputs[20] = (
             f"₹{total_expenses:,.2f}", f"₹{avg_monthly_expense:,.2f}", 
             highest_month_name, highest_month_value, 
-            lowest_month_name, lowest_month_value,
-            fig_trend, fig_pie, fig_bar,
-            table_data, table_columns,
-            *default_outputs[11:]
+            lowest_month_name, lowest_month_value
         )
+        outputs[21], outputs[22], outputs[23] = fig_trend, fig_pie, fig_bar
+        outputs[24], outputs[25] = table_data, table_columns
+        
+    elif pathname == '/savings':
+        outputs[0] = savings_monitor_layout
+        
+        savings_filtered_df = canara_df.copy()
+        if savings_months:
+            savings_filtered_df = savings_filtered_df[savings_filtered_df["Month"].isin(savings_months)]
+        if savings_categories:
+            savings_filtered_df = savings_filtered_df[savings_filtered_df["Category"].isin(savings_categories)]
+            
+        # Calculate Savings KPIs
+        total_savings_credit = savings_filtered_df['Credit'].sum()
+        total_savings_debit = savings_filtered_df['Debit'].sum()
+        net_savings = total_savings_credit - total_savings_debit
+        
+        # Savings Trend Chart
+        monthly_savings_trend = savings_filtered_df.groupby("Month").agg(Credit=('Credit', 'sum'), Debit=('Debit', 'sum')).reset_index()
+        monthly_savings_trend["Net"] = monthly_savings_trend["Credit"] - monthly_savings_trend["Debit"]
+        
+        fig_savings_trend = go.Figure()
+        fig_savings_trend.add_trace(go.Bar(x=monthly_savings_trend['Month'], y=monthly_savings_trend['Credit'], name='Credit (Savings)', marker_color=CUSTOM_COLOR_PALETTE[0]))
+        fig_savings_trend.add_trace(go.Bar(x=monthly_savings_trend['Month'], y=monthly_savings_trend['Debit'], name='Debit (Withdrawals)', marker_color=CUSTOM_COLOR_PALETTE[1]))
+        fig_savings_trend.add_trace(go.Scatter(x=monthly_savings_trend['Month'], y=monthly_savings_trend['Net'], name='Net Savings', mode='lines+markers', line=dict(color=CUSTOM_COLOR_PALETTE[2], width=4)))
+        
+        fig_savings_trend.update_layout(
+            barmode='group',
+            title=f"<span style='color:{CUSTOM_COLOR_PALETTE[0]}'>Monthly Savings and Withdrawals Trend</span>",
+            xaxis_title="Month",
+            yaxis_title="Amount (₹)",
+            legend_title="Type",
+            template="plotly_dark",
+            title_x=0.5,
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(color=CUSTOM_COLOR_PALETTE[0]),
+        )
+        
+        # Savings by Category Bar Chart
+        savings_category_summary = savings_filtered_df.groupby("Category").agg(TotalCredit=('Credit', 'sum'), TotalDebit=('Debit', 'sum')).reset_index()
+        fig_savings_category_bar = go.Figure()
+        fig_savings_category_bar.add_trace(go.Bar(x=savings_category_summary['Category'], y=savings_category_summary['TotalCredit'], name='Total Credit', marker_color=CUSTOM_COLOR_PALETTE[0]))
+        fig_savings_category_bar.add_trace(go.Bar(x=savings_category_summary['Category'], y=savings_category_summary['TotalDebit'], name='Total Debit', marker_color=CUSTOM_COLOR_PALETTE[1]))
+        
+        fig_savings_category_bar.update_layout(
+            barmode='group',
+            title=f"<span style='color:{CUSTOM_COLOR_PALETTE[1]}'>Savings & Withdrawals by Category</span>",
+            xaxis_title="Category",
+            yaxis_title="Amount (₹)",
+            legend_title="Type",
+            template="plotly_dark",
+            title_x=0.5,
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(color=CUSTOM_COLOR_PALETTE[0]),
+        )
+        
+        # Data Table
+        savings_table_data = savings_filtered_df.to_dict('records')
+        savings_table_columns = [{"name": i, "id": i} for i in savings_filtered_df.columns]
+        
+        outputs[26], outputs[27], outputs[28] = (f"₹{total_savings_credit:,.2f}", f"₹{total_savings_debit:,.2f}", f"₹{net_savings:,.2f}")
+        outputs[29], outputs[30] = fig_savings_trend, fig_savings_category_bar
+        outputs[31], outputs[32] = savings_table_data, savings_table_columns
+
+    elif pathname == '/investments':
+        outputs[0] = investments_layout
+        
+        investments_filtered_df = investments_df.copy()
+        if investments_months:
+            investments_filtered_df = investments_filtered_df[investments_filtered_df["Month"].isin(investments_months)]
+        if investments_categories:
+            investments_filtered_df = investments_filtered_df[investments_filtered_df["Category"].isin(investments_categories)]
+
+        # Calculate Investments KPIs
+        total_investments = investments_filtered_df['Amount'].sum()
+        avg_monthly_investment = investments_filtered_df.groupby("Month")['Amount'].sum().mean() if not investments_filtered_df.empty else 0
+        
+        category_investments = investments_filtered_df.groupby('Category')['Amount'].sum().reset_index()
+        if not category_investments.empty:
+            highest_category = category_investments.loc[category_investments['Amount'].idxmax()]
+            lowest_category = category_investments.loc[category_investments['Amount'].idxmin()]
+            highest_category_name = highest_category['Category']
+            highest_category_value = f"₹{highest_category['Amount']:,.2f}"
+            lowest_category_name = lowest_category['Category']
+            lowest_category_value = f"₹{lowest_category['Amount']:,.2f}"
+        else:
+            highest_category_name = "N/A"
+            highest_category_value = "₹0.00"
+            lowest_category_name = "N/A"
+            lowest_category_value = "₹0.00"
+        
+        # Investments Trend Chart
+        monthly_investments_trend = investments_filtered_df.groupby("Month")["Amount"].sum().reset_index()
+        fig_investments_trend = px.line(
+            monthly_investments_trend,
+            x="Month",
+            y="Amount",
+            title=f"<span style='color:{CUSTOM_COLOR_PALETTE[0]}'>Monthly Investments Trend</span>",
+            labels={"Amount": "Amount (₹)", "Month": "Month"},
+            template="plotly_dark",
+            color_discrete_sequence=[CUSTOM_COLOR_PALETTE[0]]
+        )
+        fig_investments_trend.update_layout(
+            title_x=0.5,
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(color=CUSTOM_COLOR_PALETTE[0]),
+            yaxis_title="Amount (₹)"
+        )
+
+        # Investments Category Pie Chart
+        category_summary = investments_filtered_df.groupby("Category")["Amount"].sum().reset_index()
+        fig_investments_pie = px.pie(
+            category_summary,
+            names="Category",
+            values="Amount",
+            title=f"<span style='color:{CUSTOM_COLOR_PALETTE[1]}'>Investments by Category</span>",
+            color_discrete_sequence=CUSTOM_COLOR_PALETTE,
+            template="plotly_dark"
+        )
+        fig_investments_pie.update_traces(textposition='inside', textinfo='percent+label')
+        fig_investments_pie.update_layout(
+            title_x=0.5,
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(color=CUSTOM_COLOR_PALETTE[0]),
+            legend_title="Category"
+        )
+        
+        # Monthly Investments by Category Bar Chart
+        monthly_category_summary = investments_filtered_df.groupby(["Month", "Category"])["Amount"].sum().reset_index()
+        fig_investments_bar = px.bar(
+            monthly_category_summary,
+            x="Month",
+            y="Amount",
+            color="Category",
+            title=f"<span style='color:{CUSTOM_COLOR_PALETTE[2]}'>Monthly Investments Breakdown by Category</span>",
+            barmode="group",
+            color_discrete_sequence=CUSTOM_COLOR_PALETTE,
+            labels={"Amount": "Amount (₹)", "Month": "Month", "Category": "Category"},
+            template="plotly_dark",
+        )
+        fig_investments_bar.update_layout(
+            title_x=0.5,
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(color=CUSTOM_COLOR_PALETTE[0]),
+            yaxis_title="Amount (₹)",
+            xaxis_title="Month",
+        )
+        
+        outputs[33], outputs[34] = (f"₹{total_investments:,.2f}", f"₹{avg_monthly_investment:,.2f}")
+        outputs[35], outputs[36], outputs[37], outputs[38] = (highest_category_name, highest_category_value, lowest_category_name, lowest_category_value)
+        outputs[39], outputs[40], outputs[41] = fig_investments_trend, fig_investments_pie, fig_investments_bar
+
+    elif pathname == '/analytics':
+        outputs[0] = analytics_page_layout
+        
+        combined_df_expenses = pd.DataFrame()
+        if not icic_df.empty:
+            combined_df_expenses = pd.concat([combined_df_expenses, icic_df], ignore_index=True)
+            
+        filtered_df = combined_df_expenses.copy()
+        if analytics_categories:
+            filtered_df = filtered_df[filtered_df["Category"].isin(analytics_categories)]
+        
+        # Overall Trend Analysis Chart
+        monthly_expenses_trend = filtered_df.groupby("Month")["Amount"].sum().reset_index()
+        fig_trend_analysis = px.line(
+            monthly_expenses_trend,
+            x="Month",
+            y="Amount",
+            title=f"<span style='color:{CUSTOM_COLOR_PALETTE[0]}'>Overall Expenses Trend</span>",
+            labels={"Amount": "Amount (₹)", "Month": "Month"},
+            template="plotly_dark",
+            color_discrete_sequence=[CUSTOM_COLOR_PALETTE[0]]
+        )
+        fig_trend_analysis.update_layout(
+            title_x=0.5,
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(color=CUSTOM_COLOR_PALETTE[0]),
+            yaxis_title="Amount (₹)"
+        )
+        
+        # Category Comparison Chart
+        if analytics_categories:
+            category_comparison_df = filtered_df.groupby(["Month", "Category"])["Amount"].sum().reset_index()
+            fig_category_comparison = px.line(
+                category_comparison_df,
+                x="Month",
+                y="Amount",
+                color="Category",
+                title=f"<span style='color:{CUSTOM_COLOR_PALETTE[1]}'>Monthly Expense Trend for Selected Categories</span>",
+                labels={"Amount": "Amount (₹)", "Month": "Month", "Category": "Category"},
+                template="plotly_dark",
+                color_discrete_sequence=CUSTOM_COLOR_PALETTE
+            )
+            fig_category_comparison.update_layout(
+                title_x=0.5,
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+                font=dict(color=CUSTOM_COLOR_PALETTE[0]),
+                yaxis_title="Amount (₹)"
+            )
+        else:
+            fig_category_comparison = {}
+            
+        outputs[48], outputs[49] = fig_trend_analysis, fig_category_comparison
+        
+    elif pathname == '/data-table':
+        outputs[0] = data_table_page_layout
+        
+        icic_table_data = icic_df.to_dict('records') if not icic_df.empty else []
+        icic_table_columns = [{"name": i, "id": i} for i in icic_df.columns] if not icic_df.empty else []
+        
+        canara_table_data = canara_df.to_dict('records') if not canara_df.empty else []
+        canara_table_columns = [{"name": i, "id": i} for i in canara_df.columns] if not canara_df.empty else []
+        
+        investments_table_data = investments_df.to_dict('records') if not investments_df.empty else []
+        investments_table_columns = [{"name": i, "id": i} for i in investments_df.columns] if not investments_df.empty else []
+
+        outputs[42], outputs[43], outputs[44], outputs[45], outputs[46], outputs[47] = (
+            icic_table_data, icic_table_columns, canara_table_data, canara_table_columns, investments_table_data, investments_table_columns
+        )
+
+    elif pathname == '/settings':
+        outputs[0] = settings_page_layout
+        
+    else: # Default to dashboard page if path is not recognized
+        outputs[0] = dashboard_page_layout
+
+    # Return all outputs
+    return outputs
 
 @app.callback(
     Output('savings-goal-output', 'children'),
@@ -1493,7 +1430,7 @@ def calculate_savings_goal(n_clicks, target_amount, duration, canara_json):
     historical_avg_monthly_net_savings = monthly_net_savings.mean()
 
     # Determine which calculation to perform
-    if target_amount is not None and target_amount > 0 and duration is None:
+    if target_amount is not None and target_amount > 0 and (duration is None or duration == 0):
         if historical_avg_monthly_net_savings <= 0:
             return html.P("Your historical average monthly net savings is ₹0.00 or less. Cannot predict time to goal.", className="text-warning")
         
@@ -1504,7 +1441,7 @@ def calculate_savings_goal(n_clicks, target_amount, duration, canara_json):
             f"it will take approximately {time_needed_months:,.1f} months to save ₹{target_amount:,.2f}."
         )
 
-    elif duration is not None and duration > 0 and target_amount is None:
+    elif duration is not None and duration > 0 and (target_amount is None or target_amount == 0):
         projected_savings = historical_avg_monthly_net_savings * duration
         return html.P(
             f"At your historical average monthly net savings of ₹{historical_avg_monthly_net_savings:,.2f}, "
@@ -1518,6 +1455,38 @@ def calculate_savings_goal(n_clicks, target_amount, duration, canara_json):
         )
 
     return html.P("Please enter a valid number for Target Amount, Duration, or both.", className="text-danger")
+
+@app.callback(
+    [Output('stored-icic-data', 'data'),
+     Output('stored-canara-data', 'data'),
+     Output('stored-investments-data', 'data'),
+     Output('loading-error-message', 'data'),
+     Output('data-load-status', 'children')],
+    [Input('interval-component', 'n_intervals')]
+)
+def fetch_and_store_data(n_intervals):
+    df_icic, df_canara, df_investments, error_message = load_data_from_google_sheets()
+
+    status_message = ""
+    if error_message:
+        status_message = html.Div(
+            [html.I(className="bi bi-exclamation-triangle-fill me-2"), error_message],
+            className="alert alert-danger"
+        )
+    else:
+        status_message = html.Div(
+            [html.I(className="bi bi-check-circle-fill me-2"), "Data loaded successfully!"],
+            className="alert alert-success"
+        )
+    
+    return (
+        df_icic.to_json(orient='split') if not df_icic.empty else None,
+        df_canara.to_json(orient='split') if not df_canara.empty else None,
+        df_investments.to_json(orient='split') if not df_investments.empty else None,
+        error_message,
+        status_message
+    )
+
 
 if __name__ == "__main__":
     from waitress import serve
